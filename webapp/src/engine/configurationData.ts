@@ -100,6 +100,7 @@ export const parseConfigurationData = (payload: unknown): ConfigurationData => {
   return {
     input: (Array.isArray(root.input) ? root.input : []).map(parseInput),
     expressions: (Array.isArray(root.expressions) ? root.expressions : []).map(parseExpression),
+    parts: asStringArray(root.parts),
     output: parseOutput(root.output, root),
   };
 };
