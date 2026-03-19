@@ -1,0 +1,76 @@
+{
+  "type": "parametricElement",
+  "input": [
+    {
+      "id": "$countertop-width",
+      "type": "number",
+      "default": 600,
+      "min": 200,
+      "max": 2000
+    },
+    {
+      "id": "$countertop-depth",
+      "type": "number",
+      "default": 600,
+      "min": 200,
+      "max": 2000
+    },
+    {
+      "id": "$countertop-height",
+      "type": "variable",
+      "default": 32
+    }
+  ],
+  "expressions": [
+    {
+      "id": "$ap-corner-right-location",
+      "type": "vector",
+      "inputs": ["$countertop-depth", "$countertop-width"],
+      "expression": "vec3($countertop-depth / 2 / 1000, $countertop-width / 2 / 1000, 0)"
+    },
+    {
+      "id": "$ap-corner-left-location",
+      "type": "vector",
+      "inputs": ["$countertop-depth", "$countertop-width"],
+      "expression": "vec3($countertop-depth / 1000, 0, 0)"
+    }
+  ],
+  "parts": ["counter-top_corner_main", "counter-top_corner_edge_overflow"],
+  "attachmentPoints": [
+    {
+      "id": "ap-corner-right",
+      "type": "vector",
+      "inputLocation": "$ap-corner-right-location",
+      "inputRotation": "vec3(0, 0, 0)"
+    },
+    {
+      "id": "ap-corner-left",
+      "type": "vector",
+      "inputLocation": "$ap-corner-left-location",
+      "inputRotation": "vec3(0, 0, 0)"
+    }
+  ],
+  "output": {
+    "shapekeys": [
+      {
+        "id": "$shape-width",
+        "type": "shapekey",
+        "inputs": "$countertop-width",
+        "conversion": "($countertop-width - 1000) / 1000"
+      },
+      {
+        "id": "$shape-depth",
+        "type": "shapekey",
+        "inputs": "$countertop-depth",
+        "conversion": "($countertop-depth - 1000) / 1000"
+      },
+      {
+        "id": "$shape-height",
+        "type": "shapekey",
+        "inputs": "$countertop-height",
+        "conversion": "($countertop-height - 20) / 12"
+      }
+    ],
+    "values": []
+  }
+}

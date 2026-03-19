@@ -1,0 +1,329 @@
+{
+  "active_object": "counter-top",
+  "input_count": 9,
+  "inputs": [
+    {
+      "id": "$countertop-depth",
+      "type": "number",
+      "prop_name": "dim_param_input_countertop_depth_14052b20",
+      "value": 600.0,
+      "item_has_limits": true,
+      "item_min": 200.0,
+      "item_max": 2000.0,
+      "rna_hard_min": 200.0,
+      "rna_hard_max": 2000.0,
+      "rna_soft_min": 200.0,
+      "rna_soft_max": 2000.0
+    },
+    {
+      "id": "$countertop-height",
+      "type": "number",
+      "prop_name": "dim_param_input_countertop_height_139f0df7",
+      "value": 20.0,
+      "item_has_limits": true,
+      "item_min": 20.0,
+      "item_max": 32.0,
+      "rna_hard_min": 20.0,
+      "rna_hard_max": 32.0,
+      "rna_soft_min": 20.0,
+      "rna_soft_max": 32.0
+    },
+    {
+      "id": "$countertop-margin",
+      "type": "variable",
+      "prop_name": "dim_param_input_countertop_margin_05b1af74",
+      "value": 60.0,
+      "item_has_limits": false,
+      "item_min": 0.0,
+      "item_max": 0.0,
+      "rna_hard_min": -3.4028234663852886e+38,
+      "rna_hard_max": 3.4028234663852886e+38,
+      "rna_soft_min": -3.4028234663852886e+38,
+      "rna_soft_max": 3.4028234663852886e+38
+    },
+    {
+      "id": "$countertop-width",
+      "type": "number",
+      "prop_name": "dim_param_input_countertop_width_72a6643b",
+      "value": 1400.0,
+      "item_has_limits": true,
+      "item_min": 500.0,
+      "item_max": 4000.0,
+      "rna_hard_min": 500.0,
+      "rna_hard_max": 4000.0,
+      "rna_soft_min": 500.0,
+      "rna_soft_max": 4000.0
+    },
+    {
+      "id": "$faucet-size",
+      "type": "number",
+      "prop_name": "dim_param_input_faucet_size_96e88d78",
+      "value": 0.0,
+      "item_has_limits": true,
+      "item_min": 0.0,
+      "item_max": 50.0,
+      "rna_hard_min": 0.0,
+      "rna_hard_max": 50.0,
+      "rna_soft_min": 0.0,
+      "rna_soft_max": 50.0
+    },
+    {
+      "id": "$margin-faucet-sink",
+      "type": "variable",
+      "prop_name": "dim_param_input_margin_faucet_sink_430cc1ba",
+      "value": 50.0,
+      "item_has_limits": false,
+      "item_min": 0.0,
+      "item_max": 0.0,
+      "rna_hard_min": -3.4028234663852886e+38,
+      "rna_hard_max": 3.4028234663852886e+38,
+      "rna_soft_min": -3.4028234663852886e+38,
+      "rna_soft_max": 3.4028234663852886e+38
+    },
+    {
+      "id": "$sink-depth",
+      "type": "number",
+      "prop_name": "dim_param_input_sink_depth_30abe6c9",
+      "value": 250.0,
+      "item_has_limits": true,
+      "item_min": 0.0,
+      "item_max": 1000.0,
+      "rna_hard_min": 0.0,
+      "rna_hard_max": 1000.0,
+      "rna_soft_min": 0.0,
+      "rna_soft_max": 1000.0
+    },
+    {
+      "id": "$sink-location",
+      "type": "number",
+      "prop_name": "dim_param_input_sink_location_df2bcf29",
+      "value": 0.0,
+      "item_has_limits": true,
+      "item_min": -2000.0,
+      "item_max": 2000.0,
+      "rna_hard_min": -2000.0,
+      "rna_hard_max": 2000.0,
+      "rna_soft_min": -2000.0,
+      "rna_soft_max": 2000.0
+    },
+    {
+      "id": "$sink-width",
+      "type": "number",
+      "prop_name": "dim_param_input_sink_width_e0890b63",
+      "value": 250.0,
+      "item_has_limits": true,
+      "item_min": 0.0,
+      "item_max": 1000.0,
+      "rna_hard_min": 0.0,
+      "rna_hard_max": 1000.0,
+      "rna_soft_min": 0.0,
+      "rna_soft_max": 1000.0
+    }
+  ],
+  "expression_count": 11,
+  "output_counts": {
+    "shapekeys": 7,
+    "attachmentpoints": 4,
+    "values": 6
+  },
+  "evaluated_now": {
+    "expressions": {
+      "$ap-faucet-location": [
+        475.0,
+        0.0,
+        20.0
+      ],
+      "$ap-sink-location": [
+        300.0,
+        0.0,
+        20.0
+      ],
+      "$ap-countertop-left-location": [
+        300.0,
+        -700.0,
+        0.0
+      ],
+      "$ap-countertop-right-location": [
+        300.0,
+        700.0,
+        0.0
+      ],
+      "$max-sink-width": 580.0,
+      "$max-sink-depth-02": 130.0,
+      "$max-sink-depth": 180.0,
+      "$max-sink-location": 515.0,
+      "$min-sink-location": -885.0,
+      "$min-countertop-width": 370.0,
+      "$min-countertop-depth": 420.0
+    },
+    "outputs": {
+      "shapekeys": {
+        "$shape-width": 0.13333333333333333,
+        "$shape-depth": -0.4,
+        "$shape-height": 0.0,
+        "$shape-sink-width": -0.5,
+        "$shape-sink-depth": -0.5,
+        "$shape-sink-location": 0.0,
+        "$shape-faucet-size": 0.0
+      },
+      "attachment_points": {
+        "ap-faucet-location": {
+          "location": [
+            475.0,
+            0.0,
+            20.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "ap-sink-location": {
+          "location": [
+            300.0,
+            0.0,
+            20.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "ap-countertop-left-location": {
+          "location": [
+            300.0,
+            -700.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "ap-countertop-right-location": {
+          "location": [
+            300.0,
+            700.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "values": {
+        "min-countertop-width": 370.0,
+        "min-countertop-depth": 420.0,
+        "max-sink-width": 580.0,
+        "max-sink-depth": 180.0,
+        "max-sink-location": 515.0,
+        "min-sink-location": -885.0
+      }
+    }
+  },
+  "stored_on_object": {
+    "expressions": {
+      "$ap-faucet-location": [
+        475.0,
+        0.0,
+        20.0
+      ],
+      "$ap-sink-location": [
+        300.0,
+        0.0,
+        20.0
+      ],
+      "$ap-countertop-left-location": [
+        300.0,
+        -700.0,
+        0.0
+      ],
+      "$ap-countertop-right-location": [
+        300.0,
+        700.0,
+        0.0
+      ],
+      "$max-sink-width": 580.0,
+      "$max-sink-depth-02": 130.0,
+      "$max-sink-depth": 180.0,
+      "$max-sink-location": 515.0,
+      "$min-sink-location": -885.0,
+      "$min-countertop-width": 370.0,
+      "$min-countertop-depth": 420.0
+    },
+    "outputs": {
+      "shapekeys": {
+        "$shape-width": 0.13333333333333333,
+        "$shape-depth": -0.4,
+        "$shape-height": 0.0,
+        "$shape-sink-width": -0.5,
+        "$shape-sink-depth": -0.5,
+        "$shape-sink-location": 0.0,
+        "$shape-faucet-size": 0.0
+      },
+      "attachment_points": {
+        "ap-faucet-location": {
+          "location": [
+            475.0,
+            0.0,
+            20.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "ap-sink-location": {
+          "location": [
+            300.0,
+            0.0,
+            20.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "ap-countertop-left-location": {
+          "location": [
+            300.0,
+            -700.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        },
+        "ap-countertop-right-location": {
+          "location": [
+            300.0,
+            700.0,
+            0.0
+          ],
+          "rotation": [
+            0.0,
+            0.0,
+            0.0
+          ]
+        }
+      },
+      "values": {
+        "min-countertop-width": 370.0,
+        "min-countertop-depth": 420.0,
+        "max-sink-width": 580.0,
+        "max-sink-depth": 180.0,
+        "max-sink-location": 515.0,
+        "min-sink-location": -885.0
+      }
+    }
+  }
+}

@@ -1,0 +1,308 @@
+{
+  "type": "parametricElement",
+  "input": [
+    {
+      "id": "$countertop-width",
+      "name": "Countertop Width",
+      "type": "number",
+      "default": 1400,
+      "min": 500,
+      "max": 4000
+    },
+    {
+      "id": "$countertop-depth",
+      "name": "Countertop Depth",
+      "type": "number",
+      "default": 600,
+      "min": 200,
+      "max": 2000
+    },
+    {
+      "id": "$countertop-height",
+      "name": "Countertop Height",
+      "type": "number",
+      "default": 20,
+      "min": 20,
+      "max": 32
+    },
+    {
+      "id": "$sink-width",
+      "name": "Sink Width",
+      "type": "number",
+      "default": 250,
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "id": "$sink-depth",
+      "name": "Sink Depth",
+      "type": "number",
+      "default": 250,
+      "min": 0,
+      "max": 1000
+    },
+    {
+      "id": "$sink-location",
+      "name": "Sink Location",
+      "type": "number",
+      "default": 0,
+      "min": -2000,
+      "max": 2000
+    },
+    {
+      "id": "$faucet-size",
+      "name": "Faucet Hole Size",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 50
+    },
+    {
+      "id": "$countertop-margin",
+      "name": "Countertop Margin",
+      "type": "variable",
+      "default": 60
+    },
+    {
+      "id": "$margin-faucet-sink",
+      "name": "Margin Faucet-Sink",
+      "type": "variable",
+      "default": 50
+    },
+    {
+      "id": "$shape-overhang",
+      "name": "Shape Overhang",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 28
+    }
+  ],
+  "expressions": [
+    {
+      "id": "$ap-faucet-location",
+      "type": "vector",
+      "inputs": [
+        "$countertop-depth",
+        "$sink-location",
+        "$countertop-height",
+        "$margin-faucet-sink",
+        "$faucet-size",
+        "$sink-depth"
+      ],
+      "expression": "vec3(((($countertop-depth - $sink-depth) / 2) - $margin-faucet-sink - ($faucet-size / 2)) / 1000, $sink-location/1000, $countertop-height/1000)"
+    },
+    {
+      "id": "$ap-sink-location",
+      "type": "vector",
+      "inputs": ["$countertop-depth", "$sink-location", "$countertop-height"],
+      "expression": "vec3($countertop-depth / 2 / 1000, $sink-location / 1000, $countertop-height / 1000)"
+    },
+    {
+      "id": "$ap-countertop-left-location",
+      "type": "vector",
+      "inputs": ["$countertop-depth", "$countertop-width"],
+      "expression": "vec3($countertop-depth / 2 / 1000, -$countertop-width / 2 / 1000, 0)"
+    },
+    {
+      "id": "$ap-countertop-right-location",
+      "type": "vector",
+      "inputs": ["$countertop-depth", "$countertop-width"],
+      "expression": "vec3($countertop-depth / 2 / 1000, $countertop-width / 2 / 1000, 0)"
+    },
+    {
+      "id": "$max-sink-width",
+      "type": "number",
+      "inputs": [
+        "$countertop-width",
+        "$countertop-margin",
+        "$sink-location",
+        "$sink-width"
+      ],
+      "expression": "min(($countertop-width / 2) - (2 * $countertop-margin) - abs($sink-location), $sink-width.max)"
+    },
+    {
+      "id": "$max-sink-depth",
+      "type": "number",
+      "inputs": [
+        "$countertop-depth",
+        "$countertop-margin",
+        "$margin-faucet-sink",
+        "$faucet-size",
+        "$sink-depth"
+      ],
+      "expression": "$faucet-size > 0 ? $max-sink-depth-02 : ($max-sink-depth-02 + $margin-faucet-sink)",
+      "comment": "If the faucet size is 0, the maximum sink depth can be increased by the margin between the faucet and the sink, since there is no need to account for the space taken up by the faucet. If the faucet size is greater than 0, the maximum sink depth is reduced by the margin between the faucet and the sink, since there needs to be enough space for the faucet to fit without interfering with the sink."
+    },
+    {
+      "id": "$max-sink-depth-02",
+      "type": "number",
+      "inputs": [
+        "$countertop-depth",
+        "$countertop-margin",
+        "$margin-faucet-sink",
+        "$faucet-size",
+        "$sink-depth"
+      ],
+      "expression": "min(($countertop-depth) - (2 * $countertop-margin) - $margin-faucet-sink - $faucet-size, $sink-depth.max)"
+    },
+    {
+      "id": "$max-faucet-size",
+      "type": "number",
+      "inputs": ["$faucet-size"],
+      "expression": "min(($countertop-depth - $sink-depth) /2 - $margin-faucet-sink - $countertop-margin, $faucet-size.max)"
+    },
+    {
+      "id": "$max-sink-location",
+      "type": "number",
+      "inputs": ["$countertop-width", "$countertop-margin", "$sink-width"],
+      "expression": "($countertop-width / 2) - ($countertop-margin) - ($sink-width / 2)"
+    },
+    {
+      "id": "$min-sink-location",
+      "type": "number",
+      "inputs": ["$countertop-width", "$countertop-margin", "$sink-width"],
+      "expression": "-(($countertop-width / 2) - ($countertop-margin ) - ($sink-width / 2))"
+    },
+    {
+      "id": "$min-countertop-width",
+      "type": "number",
+      "inputs": ["$sink-width", "$countertop-margin", "$sink-location"],
+      "expression": "max(($sink-width + 2 * ($countertop-margin) + abs($sink-location)), $sink-width.min)"
+    },
+    {
+      "id": "$min-countertop-depth",
+      "type": "number",
+      "inputs": [
+        "$sink-depth",
+        "$margin-faucet-sink",
+        "$faucet-size",
+        "$countertop-margin"
+      ],
+      "expression": "max(($sink-depth + $margin-faucet-sink + $faucet-size + 2 * $countertop-margin), $sink-depth.min)"
+    }
+  ],
+  "parts": ["counter-top_main", "counter-top_edge_straight"],
+  "attachmentPoints": [
+    {
+      "id": "ap-faucet-location",
+      "type": "vector",
+      "inputLocation": "$ap-faucet-location",
+      "inputRotation": "vec3(0, 0, 0)"
+    },
+    {
+      "id": "ap-sink-location",
+      "type": "vector",
+      "inputLocation": "$ap-sink-location",
+      "inputRotation": "vec3(0, 0, 0)"
+    },
+    {
+      "id": "ap-countertop-left-location",
+      "type": "vector",
+      "inputLocation": "$ap-countertop-left-location",
+      "inputRotation": "vec3(0, 0, 0)"
+    },
+    {
+      "id": "ap-countertop-right-location",
+      "type": "vector",
+      "inputLocation": "$ap-countertop-right-location",
+      "inputRotation": "vec3(0, 0, 0)"
+    }
+  ],
+  "output": {
+    "shapekeys": [
+      {
+        "id": "$shape-width",
+        "type": "shapekey",
+        "inputs": "$countertop-width",
+        "conversion": "($countertop-width - 1000) / 3000"
+      },
+      {
+        "id": "$shape-depth",
+        "type": "shapekey",
+        "inputs": "$countertop-depth",
+        "conversion": "($countertop-depth - 1000) / 1000"
+      },
+      {
+        "id": "$shape-height",
+        "type": "shapekey",
+        "inputs": "$countertop-height",
+        "conversion": "($countertop-height - 20) / 12"
+      },
+      {
+        "id": "$shape-sink-width",
+        "type": "shapekey",
+        "inputs": "$sink-width",
+        "conversion": "($sink-width - 500) / 500"
+      },
+      {
+        "id": "$shape-sink-depth",
+        "type": "shapekey",
+        "inputs": "$sink-depth",
+        "conversion": "($sink-depth - 500) / 500"
+      },
+      {
+        "id": "$shape-sink-location",
+        "type": "shapekey",
+        "inputs": "$sink-location",
+        "conversion": "$sink-location / 2000"
+      },
+      {
+        "id": "$shape-faucet-size",
+        "type": "shapekey",
+        "inputs": "$faucet-size",
+        "conversion": "$faucet-size / 30"
+      },
+      {
+        "id": "$shape-overhang",
+        "type": "shapekey",
+        "inputs": "$shape-overhang",
+        "conversion": "$shape-overhang / 28"
+      }
+    ],
+    "values": [
+      {
+        "id": "min-countertop-width",
+        "type": "number",
+        "inputs": "$min-countertop-width",
+        "comment": "The minimum width of the countertop, which is the distance from the left edge to the right edge when the width is at its minimum value, depends on the sink size."
+      },
+      {
+        "id": "min-countertop-depth",
+        "type": "number",
+        "inputs": "$min-countertop-depth",
+        "comment": "The minimum depth of the countertop, which is the distance from the front edge to the back edge when the depth is at its minimum value, depends on the sink size."
+      },
+      {
+        "id": "max-sink-width",
+        "type": "number",
+        "inputs": "$max-sink-width",
+        "comment": "The maximum width of the sink, which is the distance from the left edge to the right edge when the width is at its maximum value, depends on the countertop size."
+      },
+      {
+        "id": "max-sink-depth",
+        "type": "number",
+        "inputs": "$max-sink-depth",
+        "comment": "The maximum depth of the sink, which is the distance from the front edge to the back edge when the depth is at its maximum value, depends on the countertop size."
+      },
+      {
+        "id": "max-sink-location",
+        "type": "number",
+        "inputs": "$max-sink-location",
+        "comment": "The maximum location of the sink, which is the distance from the front edge to the back edge when the sink location is at its maximum value, depends on the countertop size."
+      },
+      {
+        "id": "max-faucet-size",
+        "type": "number",
+        "inputs": "$max-faucet-size",
+        "comment": "The maximum size of the faucet, which is the distance from the front edge to the back edge when the faucet size is at its maximum value, depends on the countertop size and sink size."
+      },
+      {
+        "id": "min-sink-location",
+        "type": "number",
+        "inputs": "$min-sink-location",
+        "comment": "The minimum location of the sink, which is the distance from the front edge to the back edge when the sink location is at its minimum value, depends on the countertop size."
+      }
+    ]
+  }
+}

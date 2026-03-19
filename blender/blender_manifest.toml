@@ -1,0 +1,11 @@
+schema_version = "1.0.0"
+name = "Paramteric Configuration"
+id = "aparmetric_configoration"
+tags = ["Development", "Render"]
+version = "0.0.1"
+blender_version_min = "4.2.0"
+type = "add-on"
+tagline = "A 3Dimerce parametric configuration Tool"
+maintainer = "3Dimerce"
+license = ["SPDX:LGPL-3.0-or-later"]
+wheels = []
