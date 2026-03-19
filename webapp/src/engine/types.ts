@@ -55,6 +55,7 @@ export interface ConfigurationExpression {
 export interface ConfigurationData {
   input: ConfigurationInput[];
   expressions: ConfigurationExpression[];
+  parts?: string[];
   output: ConfigurationOutput;
 }
 
