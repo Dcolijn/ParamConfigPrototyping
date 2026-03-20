@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useMemo, useRef } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { Material, Mesh, MeshStandardMaterial, Object3D, Texture } from 'three'
 import { EquirectangularReflectionMapping, MeshStandardMaterial as ThreeMeshStandardMaterial } from 'three'
 import { Canvas, useThree } from '@react-three/fiber'
@@ -145,12 +145,13 @@ function ModelPart({ url, partName, index, shapekeys, pbrPackage, pbrRepeat, onW
   const { scene } = useGLTF(url)
   const { invalidate } = useThree()
   const sceneInstance = useMemo(() => scene.clone(), [scene])
+  const meshesRef = useRef<Mesh[]>([])
+  const availableMorphNamesRef = useRef<Set<string>>(new Set())
+  const previousRelevantShapekeysRef = useRef<Record<string, EvaluationResult['outputs']['shapekeys'][string]>>({})
 
   useEffect(() => {
+    const meshes: Mesh[] = []
     const availableMorphNames = new Set<string>()
-    const missingByShapekey = new Set<string>()
-
-    const disposeMaterialTextures = applyGlobalMaterialSet(sceneInstance, pbrPackage, pbrRepeat)
 
     sceneInstance.traverse((node) => {
       if (!(node as Mesh).isMesh) {
@@ -158,27 +159,61 @@ function ModelPart({ url, partName, index, shapekeys, pbrPackage, pbrRepeat, onW
       }
 
       const mesh = node as Mesh
-      const meshWarnings = applyShapekeysToMesh(mesh, shapekeys)
-
+      meshes.push(mesh)
       Object.keys(mesh.morphTargetDictionary ?? {}).forEach((name) => {
         availableMorphNames.add(name)
       })
-
-      meshWarnings.forEach((warningId) => {
-        missingByShapekey.add(warningId)
-      })
     })
 
-    const filteredWarnings = Array.from(missingByShapekey).filter((shapekeyId) => !availableMorphNames.has(shapekeyId))
+    meshesRef.current = meshes
+    availableMorphNamesRef.current = availableMorphNames
+    previousRelevantShapekeysRef.current = {}
+  }, [sceneInstance])
 
-    onWarningsChange(partName, filteredWarnings.map((shapekeyId) => `Part "${partName}": morph target "${shapekeyId}" ontbreekt.`))
-    // In gewone taal: shapekey- of materiaalwijzigingen zijn direct zichtbaar, zonder continu te renderen.
+  useEffect(() => {
+    const disposeMaterialTextures = applyGlobalMaterialSet(sceneInstance, pbrPackage, pbrRepeat)
     invalidate()
 
     return () => {
       disposeMaterialTextures()
     }
-  }, [invalidate, onWarningsChange, partName, pbrPackage, pbrRepeat, sceneInstance, shapekeys])
+  }, [invalidate, pbrPackage, pbrRepeat, sceneInstance])
+
+  useEffect(() => {
+    const availableMorphNames = availableMorphNamesRef.current
+    const relevantShapekeyKeys = Object.keys(shapekeys).filter((shapekeyId) => availableMorphNames.has(shapekeyId))
+    const previousRelevantShapekeys = previousRelevantShapekeysRef.current
+
+    const didRelevantValuesChange =
+      relevantShapekeyKeys.length !== Object.keys(previousRelevantShapekeys).length ||
+      relevantShapekeyKeys.some((shapekeyId) => previousRelevantShapekeys[shapekeyId] !== shapekeys[shapekeyId])
+
+    // In gewone taal: we updaten morph sliders alleen als er echt een relevante waarde veranderde.
+    // Zo slaan we onnodig werk op alle meshes over.
+    if (didRelevantValuesChange) {
+      meshesRef.current.forEach((mesh) => {
+        applyShapekeysToMesh(mesh, shapekeys)
+      })
+
+      previousRelevantShapekeysRef.current = relevantShapekeyKeys.reduce<
+        Record<string, EvaluationResult['outputs']['shapekeys'][string]>
+      >((accumulator, shapekeyId) => {
+        accumulator[shapekeyId] = shapekeys[shapekeyId]
+        return accumulator
+      }, {})
+
+      // In gewone taal: shapekey- of materiaalwijzigingen zijn direct zichtbaar, zonder continu te renderen.
+      invalidate()
+    }
+
+    // In gewone taal: waarschuwingen rekenen we apart uit op basis van de eerder gecachte morph-namen.
+    // Daardoor hoeven we niet telkens de hele scene opnieuw te doorlopen.
+    const warnings = Object.keys(shapekeys)
+      .filter((shapekeyId) => !availableMorphNames.has(shapekeyId))
+      .map((shapekeyId) => `Part "${partName}": morph target "${shapekeyId}" ontbreekt.`)
+
+    onWarningsChange(partName, warnings)
+  }, [invalidate, onWarningsChange, partName, shapekeys])
 
   return <primitive object={sceneInstance} position={[0, index * 0.001, 0]} name={partName} />
 }
@@ -224,15 +259,18 @@ export default function ParametricScene({
     onMorphTargetWarningsChange?.([])
   }, [safePartNamesKey, onMorphTargetWarningsChange])
 
-  const handleWarningsChange = (partName: string, warnings: string[]) => {
-    warningsByPartRef.current = {
-      ...warningsByPartRef.current,
-      [partName]: warnings,
-    }
+  const handleWarningsChange = useCallback(
+    (partName: string, warnings: string[]) => {
+      warningsByPartRef.current = {
+        ...warningsByPartRef.current,
+        [partName]: warnings,
+      }
 
-    const mergedWarnings = Object.values(warningsByPartRef.current).flat()
-    onMorphTargetWarningsChange?.(mergedWarnings)
-  }
+      const mergedWarnings = Object.values(warningsByPartRef.current).flat()
+      onMorphTargetWarningsChange?.(mergedWarnings)
+    },
+    [onMorphTargetWarningsChange],
+  )
 
   return (
     <Canvas camera={{ position: [2.8, 2.2, 2.8], fov: 50 }} frameloop="demand">
