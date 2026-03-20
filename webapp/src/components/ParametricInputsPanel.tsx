@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from 'react'
 import type { ConfigurationInput } from '../engine/types'
 
 type ParametricInputValue = number | boolean
@@ -20,6 +21,45 @@ const clampNumber = (value: number, min?: number, max?: number): number => {
 export default function ParametricInputsPanel({ inputs, values, onValueChange }: ParametricInputsPanelProps) {
   const standardInputs = inputs.filter((input) => input.type !== 'variable')
   const variableInputs = inputs.filter((input) => input.type === 'variable')
+  const [liveSliderValues, setLiveSliderValues] = useState<Record<string, number>>({})
+  const flushTimersRef = useRef<Record<string, number>>({})
+
+  useEffect(() => {
+    return () => {
+      // In gewone taal: als dit paneel verdwijnt, stoppen we alle nog lopende timers netjes.
+      Object.values(flushTimersRef.current).forEach((timerId) => window.clearTimeout(timerId))
+    }
+  }, [])
+
+  useEffect(() => {
+    // In gewone taal: bij een nieuwe set inputs (bijv. andere PME) beginnen de live-sliderwaarden weer schoon.
+    setLiveSliderValues({})
+  }, [inputs])
+
+  const commitSliderValueSoon = (id: string, value: number) => {
+    const existingTimer = flushTimersRef.current[id]
+    if (existingTimer) {
+      window.clearTimeout(existingTimer)
+    }
+
+    // In gewone taal: "debounce" betekent hier:
+    // pas na een héél korte pauze sturen we de waarde door naar de globale app-state.
+    // Daardoor blijft slepen soepel en rekenen we niet bij elke pixelbeweging opnieuw.
+    flushTimersRef.current[id] = window.setTimeout(() => {
+      onValueChange(id, value)
+      delete flushTimersRef.current[id]
+    }, 80)
+  }
+
+  const flushSliderImmediately = (id: string, value: number) => {
+    const existingTimer = flushTimersRef.current[id]
+    if (existingTimer) {
+      window.clearTimeout(existingTimer)
+      delete flushTimersRef.current[id]
+    }
+    // In gewone taal: bij loslaten van de slider sturen we meteen de laatste stand door.
+    onValueChange(id, value)
+  }
 
   return (
     <aside className="inputs-panel" aria-label="Parametrische instellingen">
@@ -46,7 +86,13 @@ export default function ParametricInputsPanel({ inputs, values, onValueChange }:
         const min = typeof input.min === 'number' ? input.min : 0
         const max = typeof input.max === 'number' ? input.max : Math.max(min + 100, Number(currentValue ?? min) + 100)
         const step = Number.isInteger(min) && Number.isInteger(max) ? 1 : 0.1
-        const numericValue = clampNumber(Number(currentValue ?? input.default ?? min), input.min, input.max)
+        const committedValue = clampNumber(Number(currentValue ?? input.default ?? min), input.min, input.max)
+        const localValue = liveSliderValues[input.id]
+        const liveValue = clampNumber(
+          Number(typeof localValue === 'number' ? localValue : committedValue),
+          input.min,
+          input.max,
+        )
 
         return (
           <div key={input.id} className="input-card">
@@ -62,18 +108,27 @@ export default function ParametricInputsPanel({ inputs, values, onValueChange }:
                 min={min}
                 max={max}
                 step={step}
-                value={numericValue}
-                onChange={(event) => onValueChange(input.id, Number(event.target.value))}
+                value={liveValue}
+                onChange={(event) => {
+                  const next = clampNumber(Number(event.target.value), input.min, input.max)
+                  setLiveSliderValues((previous) => ({ ...previous, [input.id]: next }))
+                  commitSliderValueSoon(input.id, next)
+                }}
+                onPointerUp={(event) => {
+                  const next = clampNumber(Number((event.currentTarget as HTMLInputElement).value), input.min, input.max)
+                  flushSliderImmediately(input.id, next)
+                }}
               />
               <input
                 type="number"
                 min={min}
                 max={max}
                 step={step}
-                value={numericValue}
+                value={liveValue}
                 onChange={(event) => {
                   const next = clampNumber(Number(event.target.value), input.min, input.max)
-                  onValueChange(input.id, next)
+                  setLiveSliderValues((previous) => ({ ...previous, [input.id]: next }))
+                  flushSliderImmediately(input.id, next)
                 }}
               />
             </div>
