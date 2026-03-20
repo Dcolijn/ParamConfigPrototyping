@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { ChangeEvent, useEffect, useMemo, useState } from 'react'
 import ParametricInputsPanel from './components/ParametricInputsPanel'
 import DebugPanel from './components/DebugPanel'
 import PMESelector from './components/PMESelector'
@@ -6,6 +6,7 @@ import { loadConfigurationDataFromJson } from './engine/configurationData'
 import { evaluateConfiguration } from './engine/evaluator'
 import type { ConfigurationData } from './engine/types'
 import ParametricScene from './scene/ParametricScene'
+import { loadIone3dPackage, type LoadedPbrPackage } from './scene/pbrPackage'
 import './App.css'
 
 type InputValue = number | boolean
@@ -32,6 +33,8 @@ export default function App() {
   const [isLoadingConfig, setIsLoadingConfig] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [morphWarnings, setMorphWarnings] = useState<string[]>([])
+  const [pbrPackage, setPbrPackage] = useState<LoadedPbrPackage | null>(null)
+  const [pbrStatus, setPbrStatus] = useState<string>('Nog geen .ione3d bestand geladen.')
 
   useEffect(() => {
     let isCurrent = true
@@ -80,6 +83,12 @@ export default function App() {
     }
   }, [selectedPme])
 
+  useEffect(() => {
+    return () => {
+      pbrPackage?.dispose()
+    }
+  }, [pbrPackage])
+
   const evaluation = useMemo(() => {
     if (!configuration) {
       return null
@@ -94,12 +103,52 @@ export default function App() {
     setInputValues((previous) => ({ ...previous, [id]: value }))
   }
 
+  const handlePbrUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0]
+
+    if (!selectedFile) {
+      return
+    }
+
+    if (!selectedFile.name.toLowerCase().endsWith('.ione3d')) {
+      setPbrStatus('Upload mislukt: kies een bestand met de extensie .ione3d.')
+      return
+    }
+
+    setPbrStatus(`Bezig met laden van ${selectedFile.name}...`)
+
+    try {
+      const loadedPackage = await loadIone3dPackage(selectedFile)
+
+      // In gewone taal: oude textures opruimen, daarna de nieuwe set overal gebruiken.
+      setPbrPackage((previous) => {
+        previous?.dispose()
+        return loadedPackage
+      })
+
+      setPbrStatus(`Geladen: ${loadedPackage.sourceFileName}. De PBR maps zijn nu globaal toegepast op alle 3D parts.`)
+    } catch (error) {
+      setPbrStatus(error instanceof Error ? `Upload mislukt: ${error.message}` : 'Upload mislukt door een onbekende fout.')
+    } finally {
+      // In gewone taal: input resetten zodat hetzelfde bestand opnieuw gekozen kan worden.
+      event.target.value = ''
+    }
+  }
+
   return (
     <main className="app-shell">
       <h1>Parametrische configuratie</h1>
       <p>Kies eerst een PME, pas daarna de waarden aan. Het 3D-model en de uitkomsten verversen automatisch.</p>
 
       <PMESelector options={PME_OPTIONS} selected={selectedPme} isLoading={isLoadingConfig} onSelect={setSelectedPme} />
+
+      <section className="model-upload-toolbar">
+        <label className="browse-button" htmlFor="pbr-upload-input">
+          Upload .ione3d PBR set
+          <input id="pbr-upload-input" type="file" accept=".ione3d" onChange={handlePbrUpload} />
+        </label>
+        <span>{pbrStatus}</span>
+      </section>
 
       {loadError ? <p className="error-banner">{loadError}</p> : null}
 
@@ -113,6 +162,7 @@ export default function App() {
             shapekeys={evaluation?.outputs.shapekeys ?? {}}
             attachmentPoints={evaluation?.outputs.attachment_points ?? {}}
             onMorphTargetWarningsChange={setMorphWarnings}
+            pbrPackage={pbrPackage}
           />
         </div>
       </section>

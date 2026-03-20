@@ -1,10 +1,12 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react'
-import type { Mesh } from 'three'
-import { Canvas } from '@react-three/fiber'
+import type { Material, Mesh, MeshStandardMaterial, Object3D } from 'three'
+import { EquirectangularReflectionMapping, MeshStandardMaterial as ThreeMeshStandardMaterial } from 'three'
+import { Canvas, useThree } from '@react-three/fiber'
 import { OrbitControls, useGLTF } from '@react-three/drei'
 import type { EvaluationResult } from '../engine/types'
 import { applyShapekeysToMesh } from './morphTargets'
 import AttachmentPointsLayer from './AttachmentPointsLayer'
+import type { LoadedPbrPackage } from './pbrPackage'
 
 interface ParametricSceneProps {
   partNames: string[]
@@ -12,6 +14,7 @@ interface ParametricSceneProps {
   shapekeys: EvaluationResult['outputs']['shapekeys']
   attachmentPoints: EvaluationResult['outputs']['attachment_points']
   onMorphTargetWarningsChange?: (warnings: string[]) => void
+  pbrPackage: LoadedPbrPackage | null
 }
 
 interface ModelPartProps {
@@ -19,16 +22,98 @@ interface ModelPartProps {
   partName: string
   index: number
   shapekeys: EvaluationResult['outputs']['shapekeys']
+  pbrPackage: LoadedPbrPackage | null
   onWarningsChange: (partName: string, warnings: string[]) => void
 }
 
-function ModelPart({ url, partName, index, shapekeys, onWarningsChange }: ModelPartProps) {
+const applyGlobalMaterialSet = (root: Object3D, pbrPackage: LoadedPbrPackage | null) => {
+  root.traverse((node) => {
+    if (!(node as Mesh).isMesh) {
+      return
+    }
+
+    const mesh = node as Mesh
+    const originalMaterial = mesh.material as Material | Material[]
+
+    const ensureStandardMaterial = (material: Material): MeshStandardMaterial => {
+      if (material instanceof ThreeMeshStandardMaterial) {
+        return material
+      }
+
+      // In gewone taal: als het model een ander materiaaltype heeft, zetten we het om naar PBR.
+      const converted = new ThreeMeshStandardMaterial({
+        color: '#ffffff',
+      })
+
+      material.dispose()
+      return converted
+    }
+
+    if (Array.isArray(originalMaterial)) {
+      mesh.material = originalMaterial.map(ensureStandardMaterial)
+    } else {
+      mesh.material = ensureStandardMaterial(originalMaterial)
+    }
+
+    const assignToMaterial = (material: MeshStandardMaterial) => {
+      if (!pbrPackage) {
+        return
+      }
+
+      const { diffuseMap, normalMap, ormMap, roughness, metalness, envMap, envMapIntensity } = pbrPackage.textureSet
+
+      material.map = diffuseMap
+      material.normalMap = normalMap
+      material.aoMap = ormMap
+      material.roughnessMap = ormMap
+      material.metalnessMap = ormMap
+      material.roughness = roughness
+      material.metalness = metalness
+      material.envMap = envMap
+      material.envMapIntensity = envMapIntensity
+      material.needsUpdate = true
+    }
+
+    if (Array.isArray(mesh.material)) {
+      mesh.material.forEach((material) => assignToMaterial(material as MeshStandardMaterial))
+    } else {
+      assignToMaterial(mesh.material as MeshStandardMaterial)
+    }
+  })
+}
+
+function SceneEnvironment({ pbrPackage }: { pbrPackage: LoadedPbrPackage | null }) {
+  const { scene } = useThree()
+
+  useEffect(() => {
+    if (!pbrPackage?.textureSet.envMap) {
+      scene.environment = null
+      return
+    }
+
+    const environmentTexture = pbrPackage.textureSet.envMap
+    environmentTexture.mapping = EquirectangularReflectionMapping
+    scene.environment = environmentTexture
+
+    return () => {
+      if (scene.environment === environmentTexture) {
+        scene.environment = null
+      }
+    }
+  }, [pbrPackage, scene])
+
+  return null
+}
+
+function ModelPart({ url, partName, index, shapekeys, pbrPackage, onWarningsChange }: ModelPartProps) {
   const { scene } = useGLTF(url)
   const sceneInstance = useMemo(() => scene.clone(), [scene])
 
   useEffect(() => {
     const availableMorphNames = new Set<string>()
     const missingByShapekey = new Set<string>()
+
+    applyGlobalMaterialSet(sceneInstance, pbrPackage)
 
     sceneInstance.traverse((node) => {
       if (!(node as Mesh).isMesh) {
@@ -50,7 +135,7 @@ function ModelPart({ url, partName, index, shapekeys, onWarningsChange }: ModelP
     const filteredWarnings = Array.from(missingByShapekey).filter((shapekeyId) => !availableMorphNames.has(shapekeyId))
 
     onWarningsChange(partName, filteredWarnings.map((shapekeyId) => `Part "${partName}": morph target "${shapekeyId}" ontbreekt.`))
-  }, [onWarningsChange, partName, sceneInstance, shapekeys])
+  }, [onWarningsChange, partName, pbrPackage, sceneInstance, shapekeys])
 
   return <primitive object={sceneInstance} position={[0, index * 0.001, 0]} name={partName} />
 }
@@ -61,6 +146,7 @@ export default function ParametricScene({
   shapekeys,
   attachmentPoints,
   onMorphTargetWarningsChange,
+  pbrPackage,
 }: ParametricSceneProps) {
   const safePartNames = partNames.filter((partName) => partName.trim().length > 0)
   const safePartNamesKey = useMemo(() => safePartNames.join('|'), [safePartNames])
@@ -85,6 +171,7 @@ export default function ParametricScene({
     <Canvas camera={{ position: [2.8, 2.2, 2.8], fov: 50 }}>
       <ambientLight intensity={0.7} />
       <directionalLight position={[4, 6, 4]} intensity={1.1} />
+      <SceneEnvironment pbrPackage={pbrPackage} />
 
       <Suspense fallback={null}>
         <group>
@@ -103,6 +190,7 @@ export default function ParametricScene({
                   url={url}
                   index={index}
                   shapekeys={shapekeys}
+                  pbrPackage={pbrPackage}
                   onWarningsChange={handleWarningsChange}
                 />
               </group>
