@@ -95,7 +95,8 @@ export default function App() {
     if (!configuration) {
       return null
     }
-    // In gewone taal: elke wijziging in de schuifjes laat alle uitkomsten direct opnieuw berekenen.
+    // In gewone taal: deze berekening is zwaar. De input-component stuurt sliderupdates bewust minder vaak door,
+    // zodat dit blok niet bij élke pixel tijdens slepen opnieuw hoeft te draaien.
     return evaluateConfiguration(configuration, inputValues)
   }, [configuration, inputValues])
 
