@@ -335,14 +335,39 @@ const compileAst = (expression: string): AstNode => {
   return parser.parseExpression();
 };
 
-export const evaluateConfiguration = (configData: ConfigurationData, inputValues: Record<string, unknown>): EvaluationResult => {
+export type PreparedEvaluator = {
+  configData: ConfigurationData;
+  inputMeta: Record<string, { default: unknown; min: unknown; max: unknown; type: string }>;
+  expressionMap: Record<string, ConfigurationData['expressions'][number]>;
+  expressionAstCache: Map<string, AstNode>;
+};
+
+export const prepareEvaluator = (configData: ConfigurationData): PreparedEvaluator => {
   const inputMeta = Object.fromEntries(
     configData.input.map((input) => [input.id, { default: input.default, min: input.min, max: input.max, type: input.type }]),
   );
   const expressionMap = Object.fromEntries(configData.expressions.filter((expr) => expr.id).map((expr) => [expr.id, expr]));
-  const expressionCache: Record<string, EvaluatedValue> = {};
-
   const expressionAstCache = new Map<string, AstNode>();
+
+  // In gewone taal: parsing/tokenizing doen we één keer vooraf en bewaren we in deze cache.
+  // Daardoor krijgt de CPU geen onnodige pieken als de gebruiker snel sliders beweegt.
+  const precompile = (expressionText: string) => {
+    if (!expressionAstCache.has(expressionText)) expressionAstCache.set(expressionText, compileAst(expressionText));
+  };
+
+  for (const expression of Object.values(expressionMap)) precompile(expression.expression);
+  for (const output of configData.output.shapekeys) precompile(output.conversion);
+  for (const output of configData.output.attachmentpoints) {
+    precompile(output.inputLocation);
+    precompile(output.inputRotation);
+  }
+
+  return { configData, inputMeta, expressionMap, expressionAstCache };
+};
+
+export const runEvaluator = (prepared: PreparedEvaluator, inputValues: Record<string, unknown>): EvaluationResult => {
+  const { configData, inputMeta, expressionMap, expressionAstCache } = prepared;
+  const expressionCache: Record<string, EvaluatedValue> = {};
 
   const resolveRef = (refId: string, attr: string | null): unknown => {
     if (attr && ['min', 'max', 'default'].includes(attr)) {
@@ -495,3 +520,6 @@ export const evaluateConfiguration = (configData: ConfigurationData, inputValues
     },
   };
 };
+
+export const evaluateConfiguration = (configData: ConfigurationData, inputValues: Record<string, unknown>): EvaluationResult =>
+  runEvaluator(prepareEvaluator(configData), inputValues);
