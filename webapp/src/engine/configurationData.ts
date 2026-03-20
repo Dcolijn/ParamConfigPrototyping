@@ -18,6 +18,13 @@ const asString = (value: unknown, fallback = ''): string => (typeof value === 's
 const asNumber = (value: unknown): number | undefined => (typeof value === 'number' && Number.isFinite(value) ? value : undefined);
 const asStringArray = (value: unknown): string[] => (Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []);
 
+const assertParametricElementType = (root: Record<string, unknown>): void => {
+  // In gewone taal: we accepteren alleen JSON's met type "parametricElement".
+  if (root.type !== 'parametricElement') {
+    throw new Error('Ongeldige PME JSON: alleen type "parametricElement" is toegestaan.');
+  }
+};
+
 const asOutputType = (value: unknown, fallback: OutputType): OutputType => {
   const candidate = asString(value);
   return OUTPUT_TYPES.has(candidate as OutputType) ? (candidate as OutputType) : fallback;
@@ -97,6 +104,8 @@ const parseOutput = (rawOutput: unknown, root: Record<string, unknown>): Configu
 
 export const parseConfigurationData = (payload: unknown): ConfigurationData => {
   const root = asObject(payload);
+  assertParametricElementType(root);
+
   return {
     input: (Array.isArray(root.input) ? root.input : []).map(parseInput),
     expressions: (Array.isArray(root.expressions) ? root.expressions : []).map(parseExpression),
