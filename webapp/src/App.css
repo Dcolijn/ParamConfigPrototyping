@@ -208,12 +208,92 @@ h1 {
   padding: 0.85rem 1rem;
 }
 
-.debug-panel h2 {
-  font-size: 1rem;
-  margin: 0.5rem 0;
+.debug-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: flex-start;
 }
 
-.debug-panel ul {
+.debug-panel__header h2 {
   margin: 0;
+  font-size: 1rem;
+}
+
+.debug-panel__header p {
+  margin: 0.25rem 0 0;
+  font-size: 0.9rem;
+  color: #4b5563;
+}
+
+.debug-panel__copy-button {
+  border: 1px solid #a9b7ea;
+  background: #eef2ff;
+  color: #1f2a44;
+  border-radius: 8px;
+  padding: 0.45rem 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.debug-panel__copy-feedback {
+  margin: 0.6rem 0 0;
+  color: #065f46;
+  font-size: 0.86rem;
+}
+
+.debug-panel__copy-feedback--error {
+  color: #b91c1c;
+}
+
+.debug-panel__warnings {
+  margin-top: 0.75rem;
+  border: 1px dashed #f59e0b;
+  border-radius: 8px;
+  background: #fffbeb;
+  padding: 0.65rem 0.8rem;
+}
+
+.debug-panel__warnings h3 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.debug-panel__warnings ul {
+  margin: 0.35rem 0 0;
   padding-left: 1rem;
+}
+
+.debug-panel__grid {
+  margin-top: 0.8rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.debug-panel__grid h3 {
+  margin: 0 0 0.35rem;
+  font-size: 0.9rem;
+}
+
+.debug-panel__grid pre {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 0.6rem;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  font-size: 0.78rem;
+}
+
+@media (max-width: 920px) {
+  .debug-panel__header {
+    flex-direction: column;
+  }
+
+  .debug-panel__grid {
+    grid-template-columns: 1fr;
+  }
 }

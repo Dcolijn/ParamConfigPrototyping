@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import ParametricInputsPanel from './components/ParametricInputsPanel'
+import DebugPanel from './components/DebugPanel'
 import PMESelector from './components/PMESelector'
 import { loadConfigurationDataFromJson } from './engine/configurationData'
 import { evaluateConfiguration } from './engine/evaluator'
-import type { ConfigurationData, EvaluationResult } from './engine/types'
+import type { ConfigurationData } from './engine/types'
 import ParametricScene from './scene/ParametricScene'
 import './App.css'
 
@@ -22,36 +23,6 @@ const buildInitialInputs = (configuration: ConfigurationData): Record<string, In
 
 const buildModelUrlsByPart = (partNames: string[]): Record<string, string> =>
   Object.fromEntries(partNames.map((partName) => [partName, `/parts/${partName}.glb`]))
-
-function ConfigurationDebugSummary({
-  evaluation,
-  morphWarnings,
-}: {
-  evaluation: EvaluationResult
-  morphWarnings: string[]
-}) {
-  const shapeCount = Object.keys(evaluation.outputs.shapekeys).length
-  const attachmentCount = Object.keys(evaluation.outputs.attachment_points).length
-
-  return (
-    <section className="debug-panel">
-      <p>
-        Actieve evaluatie: {shapeCount} shapekeys en {attachmentCount} attachment points berekend.
-      </p>
-
-      <h2>Debug-waarschuwingen</h2>
-      {morphWarnings.length === 0 ? (
-        <p>Geen morph target-problemen gevonden.</p>
-      ) : (
-        <ul>
-          {morphWarnings.map((warning) => (
-            <li key={warning}>{warning}</li>
-          ))}
-        </ul>
-      )}
-    </section>
-  )
-}
 
 export default function App() {
   const [selectedPme, setSelectedPme] = useState(PME_OPTIONS[0])
@@ -146,7 +117,7 @@ export default function App() {
         </div>
       </section>
 
-      {evaluation ? <ConfigurationDebugSummary evaluation={evaluation} morphWarnings={morphWarnings} /> : null}
+      {evaluation ? <DebugPanel inputValues={inputValues} evaluation={evaluation} morphWarnings={morphWarnings} /> : null}
     </main>
   )
 }
