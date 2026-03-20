@@ -2,60 +2,57 @@
 setlocal
 
 REM =============================================================
-REM start-webapp.bat
-REM Start de webapp (zonder opnieuw npm install uit te voeren).
+REM build-webapp.bat
+REM Maakt een productie-build via npm run build.
 REM =============================================================
 
-REM Map van dit .bat bestand (root van het project).
 set "ROOT_DIR=%~dp0"
 set "WEBAPP_DIR=%ROOT_DIR%webapp"
 
-REM -------- Controle 1: staat Node.js op de computer? --------
+REM -------- Controle 1: Node.js aanwezig? --------
 where node >nul 2>&1
 if errorlevel 1 (
   echo [FOUT] Node.js is niet gevonden op deze computer.
   echo        Installeer Node.js LTS via: https://nodejs.org/
-  echo        Daarna kun je dit bestand opnieuw starten.
   goto :end_with_pause
 )
 
-REM -------- Controle 2: staat npm op de computer? --------
+REM -------- Controle 2: npm aanwezig? --------
 where npm >nul 2>&1
 if errorlevel 1 (
   echo [FOUT] npm is niet gevonden op deze computer.
   echo        Installeer Node.js LTS via: https://nodejs.org/
-  echo        npm wordt normaal automatisch mee geinstalleerd.
   goto :end_with_pause
 )
 
-REM -------- Controle 3: bestaat de webapp map? --------
+REM -------- Controle 3: webapp map aanwezig? --------
 if not exist "%WEBAPP_DIR%\" (
   echo [FOUT] De map "webapp" ontbreekt.
   echo        Verwacht pad: "%WEBAPP_DIR%"
   goto :end_with_pause
 )
 
-REM Extra controle: package.json moet aanwezig zijn.
 if not exist "%WEBAPP_DIR%\package.json" (
   echo [FOUT] package.json ontbreekt in:
   echo        "%WEBAPP_DIR%"
-  echo        Controleer of de map volledig is opgehaald.
   goto :end_with_pause
 )
 
 cd /d "%WEBAPP_DIR%"
 
 echo.
-echo [INFO] Webapp starten met: npm run dev
-call npm run dev
+echo [INFO] Build starten met: npm run build
+call npm run build
 if errorlevel 1 (
   echo.
-  echo [FOUT] npm run dev is mislukt.
+  echo [FOUT] npm run build is mislukt.
   echo        Controleer de foutmelding hierboven.
   goto :end_with_pause
 )
 
-goto :eof
+echo.
+echo [KLAAR] Build geslaagd.
+goto :end_with_pause
 
 :end_with_pause
 echo.

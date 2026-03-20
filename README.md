@@ -1,12 +1,34 @@
 # ParamConfigPrototyping
 Parametric Configuration Prototyping tool.
 
-## Webapp starten (zonder code-kennis)
-1. Dubbelklik op `start-webapp.bat` in de root van deze repository.
-2. Wacht tot de server gestart is.
-3. Open de URL die Vite in de terminal toont (meestal `http://localhost:5173`).
+## Ultra-simpele handleiding (Stap 1-2-3)
 
-Dat is alles: de webapp draait dan lokaal op je computer.
+Deze uitleg is gemaakt voor **niet-coders**.
+
+### Stap 1 — Eenmalig voorbereiden
+1. Dubbelklik op `setup-webapp.bat`.
+2. Wacht tot je `[KLAAR] Setup voltooid` ziet.
+3. Druk op een toets om het venster te sluiten.
+
+![Screenshot Stap 1 - setup (nog toe te voegen)](docs/screenshots/stap-1-setup.png)
+
+### Stap 2 — Webapp starten
+1. Dubbelklik op `start-webapp.bat`.
+2. Wacht tot de server draait.
+3. Open de link in het venster (meestal `http://localhost:5173`).
+
+![Screenshot Stap 2 - starten (nog toe te voegen)](docs/screenshots/stap-2-start.png)
+
+### Stap 3 — Model kiezen en sliders aanpassen
+1. Kies in de webapp het model dat je wilt bekijken.
+2. Schuif aan de sliders om afmetingen/instellingen te veranderen.
+3. Kijk direct naar het resultaat in het 3D-voorbeeld.
+
+![Screenshot Stap 3 - model + sliders (nog toe te voegen)](docs/screenshots/stap-3-model-sliders.png)
+
+### Handige extra bestanden
+- `build-webapp.bat` (optioneel): maakt een productie-build met `npm run build`.
+- Als je een foutmelding krijgt over Node.js: installeer eerst Node.js LTS via https://nodejs.org/.
 
 ## Morph targets (shapekeys) per GLB
 Onderzoek van de aanwezige `.glb`-bestanden in de repo laat zien dat alle modellen morph targets bevatten:
