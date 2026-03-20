@@ -457,28 +457,3 @@ export const evaluateConfiguration = (configData: ConfigurationData, inputValues
     },
   };
 };
-    // In gewone taal: string-tekst tussen "..." moet als één geheel gelezen worden.
-    // Dit is nodig voor __ref__("...") oproepen na het vervangen van $-referenties.
-    if (ch === '"') {
-      i += 1;
-      let value = '';
-      while (i < expression.length) {
-        const current = expression[i];
-        if (current === '\\') {
-          const escaped = expression[i + 1];
-          if (escaped === '"' || escaped === '\\') {
-            value += escaped;
-            i += 2;
-            continue;
-          }
-        }
-        if (current === '"') {
-          i += 1;
-          break;
-        }
-        value += current;
-        i += 1;
-      }
-      push('string', value);
-      continue;
-    }
