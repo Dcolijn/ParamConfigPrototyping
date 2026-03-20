@@ -4,7 +4,7 @@ import ParametricInputsPanel from './components/ParametricInputsPanel'
 import DebugPanel from './components/DebugPanel'
 import PMESelector from './components/PMESelector'
 import { loadConfigurationDataFromJson } from './engine/configurationData'
-import { evaluateConfiguration } from './engine/evaluator'
+import { prepareEvaluator, runEvaluator } from './engine/evaluator'
 import type { ConfigurationData } from './engine/types'
 import ParametricScene from './scene/ParametricScene'
 import { loadIone3dPackage, type LoadedPbrPackage } from './scene/pbrPackage'
@@ -91,14 +91,23 @@ export default function App() {
     }
   }, [pbrPackage])
 
-  const evaluation = useMemo(() => {
+  const preparedEvaluator = useMemo(() => {
     if (!configuration) {
       return null
     }
-    // In gewone taal: deze berekening is zwaar. De input-component stuurt sliderupdates bewust minder vaak door,
-    // zodat dit blok niet bij élke pixel tijdens slepen opnieuw hoeft te draaien.
-    return evaluateConfiguration(configuration, inputValues)
-  }, [configuration, inputValues])
+
+    // In gewone taal: we bouwen de "rekenmachine-voorbereiding" 1x per configuratie op.
+    // Zo hoeft bij veel slider-events niet telkens opnieuw geparsed/getokenized te worden, wat CPU-pieken voorkomt.
+    return prepareEvaluator(configuration)
+  }, [configuration])
+
+  const evaluation = useMemo(() => {
+    if (!preparedEvaluator) {
+      return null
+    }
+    // In gewone taal: bij schuiven rekenen we nu alleen met nieuwe waardes, met hergebruik van de voorbereide data.
+    return runEvaluator(preparedEvaluator, inputValues)
+  }, [preparedEvaluator, inputValues])
 
   const partNames = configuration?.parts ?? []
 
