@@ -121,6 +121,21 @@ h1 {
   gap: 0.75rem;
   align-items: center;
   margin: 0.75rem 0 1rem;
+  flex-wrap: wrap;
+}
+
+.inline-input {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-weight: 600;
+}
+
+.inline-input input {
+  width: 84px;
+  border: 1px solid #a9b7ea;
+  border-radius: 8px;
+  padding: 0.35rem 0.5rem;
 }
 
 .model-upload-toolbar button,
