@@ -50,13 +50,33 @@ const mergeModelFiles = (files: FileList | File[], previousMap: ModelUrlMap): Mo
   return nextMap
 }
 
-function ConfigurationDebugSummary({ evaluation }: { evaluation: EvaluationResult }) {
+function ConfigurationDebugSummary({
+  evaluation,
+  morphWarnings,
+}: {
+  evaluation: EvaluationResult
+  morphWarnings: string[]
+}) {
   const shapeCount = Object.keys(evaluation.outputs.shapekeys).length
   const attachmentCount = Object.keys(evaluation.outputs.attachment_points).length
+
   return (
-    <p>
-      Actieve evaluatie: {shapeCount} shapekeys en {attachmentCount} attachment points berekend.
-    </p>
+    <section className="debug-panel">
+      <p>
+        Actieve evaluatie: {shapeCount} shapekeys en {attachmentCount} attachment points berekend.
+      </p>
+
+      <h2>Debug-waarschuwingen</h2>
+      {morphWarnings.length === 0 ? (
+        <p>Geen morph target-problemen gevonden.</p>
+      ) : (
+        <ul>
+          {morphWarnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      )}
+    </section>
   )
 }
 
@@ -149,6 +169,7 @@ export default function App() {
   const [inputValues, setInputValues] = useState<Record<string, InputValue>>(() => buildInitialInputs())
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [modelUrlsByPart, setModelUrlsByPart] = useState<ModelUrlMap>({})
+  const [morphWarnings, setMorphWarnings] = useState<string[]>([])
   const modelUrlsRef = useRef<ModelUrlMap>({})
 
   useEffect(() => {
@@ -194,11 +215,17 @@ export default function App() {
         <ParametricInputsPanel inputs={configuration.input} values={inputValues} onValueChange={handleInputChange} />
 
         <div className="canvas-wrapper">
-          <ParametricScene partNames={partNames} modelUrlsByPart={modelUrlsByPart} />
+          <ParametricScene
+            partNames={partNames}
+            modelUrlsByPart={modelUrlsByPart}
+            shapekeys={evaluation.outputs.shapekeys}
+            attachmentPoints={evaluation.outputs.attachment_points}
+            onMorphTargetWarningsChange={setMorphWarnings}
+          />
         </div>
       </section>
 
-      <ConfigurationDebugSummary evaluation={evaluation} />
+      <ConfigurationDebugSummary evaluation={evaluation} morphWarnings={morphWarnings} />
 
       <ModelUploadModal
         isOpen={isUploadModalOpen}
