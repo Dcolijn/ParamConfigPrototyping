@@ -1,12 +1,13 @@
 import type { ConfigurationData, EvaluatedValue, EvaluationResult, Vec3 } from './types';
 
-type TokenType = 'number' | 'boolean' | 'identifier' | 'operator' | 'paren' | 'comma' | 'question' | 'colon' | 'eof';
+type TokenType = 'number' | 'boolean' | 'identifier' | 'string' | 'operator' | 'paren' | 'comma' | 'question' | 'colon' | 'eof';
 type Token = { type: TokenType; value: string };
 type RefCall = { kind: 'ref'; id: string; attr: string | null };
 
 type AstNode =
   | { kind: 'number'; value: number }
   | { kind: 'boolean'; value: boolean }
+  | { kind: 'string'; value: string }
   | { kind: 'identifier'; name: string }
   | RefCall
   | { kind: 'unary'; operator: string; argument: AstNode }
@@ -266,6 +267,10 @@ class Parser {
       return { kind: 'boolean', value: this.consume('boolean').value === 'true' };
     }
 
+    if (this.current().type === 'string') {
+      return { kind: 'string', value: this.consume('string').value };
+    }
+
     if (this.current().type === 'identifier') {
       const name = this.consume('identifier').value;
       if (this.match('paren', '(')) {
@@ -340,6 +345,7 @@ export const evaluateConfiguration = (configData: ConfigurationData, inputValues
     switch (node.kind) {
       case 'number':
       case 'boolean':
+      case 'string':
         return node.value;
       case 'identifier':
         return resolveRef(node.name, null);
@@ -451,3 +457,28 @@ export const evaluateConfiguration = (configData: ConfigurationData, inputValues
     },
   };
 };
+    // In gewone taal: string-tekst tussen "..." moet als één geheel gelezen worden.
+    // Dit is nodig voor __ref__("...") oproepen na het vervangen van $-referenties.
+    if (ch === '"') {
+      i += 1;
+      let value = '';
+      while (i < expression.length) {
+        const current = expression[i];
+        if (current === '\\') {
+          const escaped = expression[i + 1];
+          if (escaped === '"' || escaped === '\\') {
+            value += escaped;
+            i += 2;
+            continue;
+          }
+        }
+        if (current === '"') {
+          i += 1;
+          break;
+        }
+        value += current;
+        i += 1;
+      }
+      push('string', value);
+      continue;
+    }
