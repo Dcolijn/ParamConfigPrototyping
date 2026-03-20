@@ -114,30 +114,36 @@ const applyGlobalMaterialSet = (root: Object3D, pbrPackage: LoadedPbrPackage | n
 }
 
 function SceneEnvironment({ pbrPackage }: { pbrPackage: LoadedPbrPackage | null }) {
-  const { scene } = useThree()
+  const { scene, invalidate } = useThree()
 
   useEffect(() => {
     if (!pbrPackage?.textureSet.envMap) {
       scene.environment = null
+      // In gewone taal: we vragen direct een nieuwe tekening aan zodra de omgeving wijzigt.
+      invalidate()
       return
     }
 
     const environmentTexture = pbrPackage.textureSet.envMap
     environmentTexture.mapping = EquirectangularReflectionMapping
     scene.environment = environmentTexture
+    // In gewone taal: zonder deze "invalidate" zou je soms pas later de nieuwe belichting zien.
+    invalidate()
 
     return () => {
       if (scene.environment === environmentTexture) {
         scene.environment = null
+        invalidate()
       }
     }
-  }, [pbrPackage, scene])
+  }, [invalidate, pbrPackage, scene])
 
   return null
 }
 
 function ModelPart({ url, partName, index, shapekeys, pbrPackage, pbrRepeat, onWarningsChange }: ModelPartProps) {
   const { scene } = useGLTF(url)
+  const { invalidate } = useThree()
   const sceneInstance = useMemo(() => scene.clone(), [scene])
 
   useEffect(() => {
@@ -166,13 +172,38 @@ function ModelPart({ url, partName, index, shapekeys, pbrPackage, pbrRepeat, onW
     const filteredWarnings = Array.from(missingByShapekey).filter((shapekeyId) => !availableMorphNames.has(shapekeyId))
 
     onWarningsChange(partName, filteredWarnings.map((shapekeyId) => `Part "${partName}": morph target "${shapekeyId}" ontbreekt.`))
+    // In gewone taal: shapekey- of materiaalwijzigingen zijn direct zichtbaar, zonder continu te renderen.
+    invalidate()
 
     return () => {
       disposeMaterialTextures()
     }
-  }, [onWarningsChange, partName, pbrPackage, pbrRepeat, sceneInstance, shapekeys])
+  }, [invalidate, onWarningsChange, partName, pbrPackage, pbrRepeat, sceneInstance, shapekeys])
 
   return <primitive object={sceneInstance} position={[0, index * 0.001, 0]} name={partName} />
+}
+
+function RenderOnAttachmentChange({ attachmentPoints }: { attachmentPoints: EvaluationResult['outputs']['attachment_points'] }) {
+  const { invalidate } = useThree()
+
+  useEffect(() => {
+    // In gewone taal: als attachment points veranderen, tekenen we precies 1 nieuw frame.
+    invalidate()
+  }, [attachmentPoints, invalidate])
+
+  return null
+}
+
+function CameraControls() {
+  const { invalidate } = useThree()
+
+  return (
+    <OrbitControls
+      enableDamping
+      // In gewone taal: bij camera-beweging vragen we steeds een nieuw frame aan voor soepele besturing.
+      onChange={() => invalidate()}
+    />
+  )
 }
 
 export default function ParametricScene({
@@ -204,7 +235,8 @@ export default function ParametricScene({
   }
 
   return (
-    <Canvas camera={{ position: [2.8, 2.2, 2.8], fov: 50 }}>
+    <Canvas camera={{ position: [2.8, 2.2, 2.8], fov: 50 }} frameloop="demand">
+      {/* In gewone taal: "demand" betekent alleen tekenen wanneer er echt iets verandert. */}
       <ambientLight intensity={0.7} />
       <directionalLight position={[4, 6, 4]} intensity={1.1} />
       <SceneEnvironment pbrPackage={pbrPackage} />
@@ -236,9 +268,10 @@ export default function ParametricScene({
         </group>
 
         <AttachmentPointsLayer attachmentPoints={attachmentPoints} />
+        <RenderOnAttachmentChange attachmentPoints={attachmentPoints} />
       </Suspense>
 
-      <OrbitControls enableDamping />
+      <CameraControls />
     </Canvas>
   )
 }
