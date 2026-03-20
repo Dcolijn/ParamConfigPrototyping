@@ -1,4 +1,5 @@
-import { ChangeEvent, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import type { ChangeEvent } from 'react'
 import ParametricInputsPanel from './components/ParametricInputsPanel'
 import DebugPanel from './components/DebugPanel'
 import PMESelector from './components/PMESelector'
@@ -35,6 +36,7 @@ export default function App() {
   const [morphWarnings, setMorphWarnings] = useState<string[]>([])
   const [pbrPackage, setPbrPackage] = useState<LoadedPbrPackage | null>(null)
   const [pbrStatus, setPbrStatus] = useState<string>('Nog geen .ione3d bestand geladen.')
+  const [pbrRepeat, setPbrRepeat] = useState<number>(1)
 
   useEffect(() => {
     let isCurrent = true
@@ -135,6 +137,13 @@ export default function App() {
     }
   }
 
+  const handlePbrRepeatChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const parsed = Number(event.target.value)
+
+    // In gewone taal: alleen geldige positieve waarden accepteren, anders terugvallen op 1.
+    setPbrRepeat(Number.isFinite(parsed) && parsed > 0 ? parsed : 1)
+  }
+
   return (
     <main className="app-shell">
       <h1>Parametrische configuratie</h1>
@@ -148,6 +157,10 @@ export default function App() {
           <input id="pbr-upload-input" type="file" accept=".ione3d" onChange={handlePbrUpload} />
         </label>
         <span>{pbrStatus}</span>
+        <label className="inline-input">
+          Repeat
+          <input type="number" min="0.1" step="0.1" value={pbrRepeat} onChange={handlePbrRepeatChange} />
+        </label>
       </section>
 
       {loadError ? <p className="error-banner">{loadError}</p> : null}
@@ -163,6 +176,7 @@ export default function App() {
             attachmentPoints={evaluation?.outputs.attachment_points ?? {}}
             onMorphTargetWarningsChange={setMorphWarnings}
             pbrPackage={pbrPackage}
+            pbrRepeat={pbrRepeat}
           />
         </div>
       </section>
