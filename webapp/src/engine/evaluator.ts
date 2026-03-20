@@ -112,6 +112,44 @@ const tokenize = (expression: string): Token[] => {
       continue;
     }
 
+    if (ch === '"') {
+      // We zitten op het begin van een tekst ("..."), dus sla de eerste quote over.
+      i += 1;
+      let value = '';
+
+      while (i < expression.length) {
+        const current = expression[i];
+
+        // Escape-sequenties die we bewust ondersteunen:
+        // \"  -> voegt een echte " toe in de tekst
+        // \\  -> voegt een echte \ toe in de tekst
+        if (current === '\\' && i + 1 < expression.length) {
+          const next = expression[i + 1];
+          if (next === '"' || next === '\\') {
+            value += next;
+            i += 2;
+            continue;
+          }
+        }
+
+        // Eindquote gevonden: string-token klaar.
+        if (current === '"') {
+          i += 1;
+          push('string', value);
+          break;
+        }
+
+        value += current;
+        i += 1;
+      }
+
+      if (i > expression.length || expression[i - 1] !== '"') {
+        throw new Error('Unterminated string literal');
+      }
+
+      continue;
+    }
+
     if (ch === '(' || ch === ')') {
       push('paren', ch);
       i += 1;
