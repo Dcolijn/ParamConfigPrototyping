@@ -3,15 +3,13 @@ import type { EvaluatedValue } from '../engine/types'
 
 type ShapekeyMap = Record<string, EvaluatedValue>
 
-const clamp01 = (value: number): number => Math.max(0, Math.min(1, value))
-
 const toInfluence = (value: EvaluatedValue): number => {
   if (typeof value === 'boolean') {
     return value ? 1 : 0
   }
 
   if (typeof value === 'number' && Number.isFinite(value)) {
-    return clamp01(value)
+    return value
   }
 
   return 0
@@ -39,7 +37,7 @@ export const applyShapekeysToMesh = (mesh: Mesh, shapekeys: ShapekeyMap): string
       return
     }
 
-    // In gewone taal: evaluator rekent alles uit; hier zetten we dat veilig naar een sliderwaarde 0..1.
+    // In gewone taal: evaluator rekent alles uit; hier zetten we dat direct op de morph-target invloed.
     influences[morphIndex] = toInfluence(rawValue)
   })
 
