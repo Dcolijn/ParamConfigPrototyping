@@ -3,13 +3,15 @@
   "input": [
     {
       "id": "$countertop-width",
+      "name": "Countertop Width",
       "type": "number",
-      "default": 600,
-      "min": 200,
-      "max": 2000
+      "default": 1400,
+      "min": 500,
+      "max": 4000
     },
     {
       "id": "$countertop-depth",
+      "name": "Countertop Depth",
       "type": "number",
       "default": 600,
       "min": 200,
@@ -17,26 +19,59 @@
     },
     {
       "id": "$countertop-height",
+      "name": "Countertop Height",
       "type": "number",
       "default": 20,
       "min": 20,
       "max": 32
     },
     {
+      "id": "$countertop-margin",
+      "name": "Countertop Margin",
+      "type": "variable",
+      "default": 60
+    },
+    {
       "id": "$countertop-overhang",
+      "name": "Countertop Overhang",
       "type": "number",
       "default": 0,
       "min": 0,
       "max": 28
     }
   ],
-  "expressions": [],
-  "parts": ["counter-top_corner_main", "counter-top_corner_edge_straight"],
+  "expressions": [
+    {
+      "id": "$ap-countertop-left-location",
+      "type": "vector",
+      "inputs": ["$countertop-width"],
+      "expression": "vec3(0, -$countertop-width / 2000, 0)"
+    },
+    {
+      "id": "$ap-countertop-right-location",
+      "type": "vector",
+      "inputs": ["$countertop-width"],
+      "expression": "vec3(0, $countertop-width / 2000, 0)"
+    }
+  ],
+  "parts": ["counter-top_main_plain", "counter-top_edge_straight"],
   "attachmentPoints": [
     {
-      "id": "ap-corner-origin",
+      "id": "ap-countertop-origin",
       "type": "vector",
       "inputLocation": "vec3(0, 0, 0)",
+      "inputRotation": "vec3(0, 0, 0)"
+    },
+    {
+      "id": "ap-countertop-left",
+      "type": "vector",
+      "inputLocation": "$ap-countertop-left-location",
+      "inputRotation": "vec3(0, 0, 0)"
+    },
+    {
+      "id": "ap-countertop-right",
+      "type": "vector",
+      "inputLocation": "$ap-countertop-right-location",
       "inputRotation": "vec3(0, 0, 0)"
     }
   ],
@@ -46,7 +81,7 @@
         "id": "$shape-width",
         "type": "shapekey",
         "inputs": "$countertop-width",
-        "conversion": "($countertop-width - 1000) / 1000"
+        "conversion": "($countertop-width - 1000) / 3000"
       },
       {
         "id": "$shape-depth",

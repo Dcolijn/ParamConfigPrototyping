@@ -70,6 +70,18 @@
   ],
   "expressions": [
     {
+      "id": "$ap-countertop-left-location",
+      "type": "vector",
+      "inputs": ["$countertop-width", "$margin-faucet-sink"],
+      "expression": "vec3(0, -$countertop-width / 2000, 0)"
+    },
+    {
+      "id": "$ap-countertop-right-location",
+      "type": "vector",
+      "inputs": ["$countertop-width", "$margin-faucet-sink"],
+      "expression": "vec3(0, $countertop-width / 2000, 0)"
+    },
+    {
       "id": "$ap-faucet-location",
       "type": "vector",
       "inputs": [
@@ -80,25 +92,13 @@
         "$faucet-size",
         "$sink-depth"
       ],
-      "expression": "vec3(((($countertop-depth - $sink-depth) / 2) - $margin-faucet-sink - ($faucet-size / 2)) / 1000, $sink-location/1000, $countertop-height/1000)"
+      "expression": "vec3(((($countertop-depth - $sink-depth) / 2) - $margin-faucet-sink - ($faucet-size / 2)) / 1000, -$sink-location/1000, $countertop-height/1000)"
     },
     {
       "id": "$ap-sink-location",
       "type": "vector",
       "inputs": ["$countertop-depth", "$sink-location", "$countertop-height"],
-      "expression": "vec3($countertop-depth / 2 / 1000, $sink-location / 1000, $countertop-height / 1000)"
-    },
-    {
-      "id": "$ap-countertop-left-location",
-      "type": "vector",
-      "inputs": ["$countertop-depth", "$countertop-width"],
-      "expression": "vec3($countertop-depth / 2 / 1000, -$countertop-width / 2 / 1000, 0)"
-    },
-    {
-      "id": "$ap-countertop-right-location",
-      "type": "vector",
-      "inputs": ["$countertop-depth", "$countertop-width"],
-      "expression": "vec3($countertop-depth / 2 / 1000, $countertop-width / 2 / 1000, 0)"
+      "expression": "vec3($countertop-depth / 2 / 1000, -$sink-location / 1000, $countertop-height / 1000)"
     },
     {
       "id": "$max-sink-width",
@@ -169,7 +169,7 @@
         "$faucet-size",
         "$countertop-margin"
       ],
-      "expression": "max(($sink-depth + $margin-faucet-sink + $faucet-size + 2 * $countertop-margin), $sink-depth.min)"
+      "expression": "max(($sink-depth + 2 * $margin-faucet-sink + $faucet-size + 2 * $countertop-margin), $sink-depth.min)"
     }
   ],
   "parts": ["counter-top_main", "counter-top_edge_overflow"],
@@ -184,16 +184,30 @@
       "id": "ap-sink-location",
       "type": "vector",
       "inputLocation": "$ap-sink-location",
+      "inputRotation": "vec3(0, 0, 0)",
+      "child": {
+        "elementId": "PME_sink",
+        "targetId": "ap-countertop-sink",
+        "outputValueMapping": {
+          "countertop-width": "$sink-width",
+          "countertop-depth": "$sink-depth"
+        }
+      }
+    },
+    {
+      "id": "ap-countertop-origin",
+      "type": "vector",
+      "inputLocation": "vec3(0, 0, 0)",
       "inputRotation": "vec3(0, 0, 0)"
     },
     {
-      "id": "ap-countertop-left-location",
+      "id": "ap-countertop-left",
       "type": "vector",
       "inputLocation": "$ap-countertop-left-location",
       "inputRotation": "vec3(0, 0, 0)"
     },
     {
-      "id": "ap-countertop-right-location",
+      "id": "ap-countertop-right",
       "type": "vector",
       "inputLocation": "$ap-countertop-right-location",
       "inputRotation": "vec3(0, 0, 0)"

@@ -1,0 +1,162 @@
+{
+  "type": "parametricElement",
+  "input": [
+    {
+      "id": "$length-01",
+      "name": "Length 01",
+      "type": "number",
+      "default": 1200,
+      "min": 200,
+      "max": 2000
+    },
+    {
+      "id": "$length-02",
+      "name": "Length 02",
+      "type": "number",
+      "default": 1200,
+      "min": 200,
+      "max": 2000
+    },
+    {
+      "id": "$depth-01",
+      "name": "Depth 01",
+      "type": "number",
+      "default": 600,
+      "min": 200,
+      "max": 2000
+    },
+    {
+      "id": "$depth-02",
+      "name": "Depth 02",
+      "type": "number",
+      "default": 600,
+      "min": 200,
+      "max": 2000
+    },
+    {
+      "id": "$countertop-height",
+      "name": "Countertop Height",
+      "type": "variable",
+      "default": 32
+    },
+    {
+      "id": "$countertop-overhang",
+      "name": "Countertop Overhang",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 28
+    }
+  ],
+  "expressions": [
+    {
+      "id": "$countertop-01-width",
+      "type": "number",
+      "inputs": ["$length-01", "$depth-02"],
+      "expression": "max($length-01 - $depth-02, 500)"
+    },
+    {
+      "id": "$countertop-02-width",
+      "type": "number",
+      "inputs": ["$length-02", "$depth-01"],
+      "expression": "max($length-02 - $depth-01, 500)"
+    },
+    {
+      "id": "$min-length-01",
+      "type": "number",
+      "inputs": ["$depth-02"],
+      "expression": "$depth-02 + 500"
+    },
+    {
+      "id": "$min-length-02",
+      "type": "number",
+      "inputs": ["$depth-01"],
+      "expression": "$depth-01 + 500"
+    },
+    {
+      "id": "$max-depth-01",
+      "type": "number",
+      "inputs": ["$length-02"],
+      "expression": "$length-02 - 500"
+    },
+    {
+      "id": "$max-depth-02",
+      "type": "number",
+      "inputs": ["$length-01"],
+      "expression": "$length-01 - 500"
+    },
+    {
+      "id": "$ap-origin-countertop-01-location",
+      "type": "vector",
+      "inputs": ["$depth-02", "$countertop-01-width"],
+      "expression": "vec3(0, $depth-02 / 1000, 0)"
+    },
+    {
+      "id": "$ap-origin-countertop-02-location",
+      "type": "vector",
+      "inputs": ["$length-02", "$depth-01", "$depth-02"],
+      "expression": "vec3($depth-01 / 1000, 0, 0)"
+    },
+    {
+      "id": "$ap-origin-countertop-corner-location",
+      "type": "vector",
+      "inputs": ["$length-01", "$depth-02"],
+      "expression": "vec3(0, ($depth-02 / 2) / 1000, 0)"
+    }
+  ],
+  "parts": [],
+  "attachmentPoints": [
+    {
+      "id": "ap-origin-countertop-01",
+      "type": "vector",
+      "inputLocation": "$ap-origin-countertop-01-location",
+      "inputRotation": "vec3(0, 0, 0)",
+      "child": {
+        "elementId": "PME_counter-top_straight_plain",
+        "targetId": "ap-countertop-left",
+        "outputValueMapping": {
+          "countertop-width": "$countertop-01-width",
+          "countertop-depth": "$depth-01",
+          "countertop-height": "$countertop-height",
+          "countertop-overhang": "$countertop-overhang"
+        }
+      }
+    },
+    {
+      "id": "ap-origin-countertop-02",
+      "type": "vector",
+      "inputLocation": "$ap-origin-countertop-02-location",
+      "inputRotation": "vec3(0, 0, 90)",
+      "child": {
+        "elementId": "PME_counter-top_straight_plain",
+        "targetId": "ap-countertop-right",
+        "outputValueMapping": {
+          "countertop-width": "$countertop-02-width",
+          "countertop-depth": "$depth-02",
+          "countertop-height": "$countertop-height",
+          "countertop-overhang": "$countertop-overhang"
+        }
+      }
+    },
+    {
+      "id": "ap-origin-countertop-corner",
+      "type": "vector",
+      "inputLocation": "$ap-origin-countertop-corner-location",
+      "inputRotation": "vec3(0, 0, 0)",
+      "child": {
+        "elementId": "PME_counter-top_corner_straight",
+        "targetId": "ap-corner-origin",
+        "outputValueMapping": {
+          "countertop-width": "$depth-02",
+          "countertop-depth": "$depth-01",
+          "countertop-height": "$countertop-height",
+          "countertop-overhang": "$countertop-overhang"
+        }
+      }
+    }
+  ],
+  "output": {
+    "shapekeys": [],
+    "values": []
+  }
+}

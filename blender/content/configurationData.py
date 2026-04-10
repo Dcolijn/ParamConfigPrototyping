@@ -46,11 +46,33 @@ class ShapekeyOutput:
         self.conversion = data.get("conversion", "")
         self.comment = data.get("comment")
     
+class AttachmentPointChild:
+    """Describes a child PME wired to a parent attachment point."""
+    element_id: str
+    target_id: str
+    output_value_mapping: dict
+
+    def __init__(self, data):
+        self.element_id = data.get("elementId", "")
+        self.target_id = data.get("targetId", "")
+        mapping = data.get("outputValueMapping", {})
+        self.output_value_mapping = mapping if isinstance(mapping, dict) else {}
+
+    def normalized_mapping(self) -> dict:
+        """Return mapping with $ prefix ensured on child input IDs."""
+        result = {}
+        for key, value in self.output_value_mapping.items():
+            normalized_key = key if key.startswith("$") else f"${key}"
+            result[normalized_key] = value
+        return result
+
+
 class AttachmentPointLocationOutput:
     id: str
     type: OutputType
     input_location: str
     input_rotation: str
+    child: "AttachmentPointChild | None"
     comment: str | None
     
     def __init__(self, data):
@@ -58,6 +80,8 @@ class AttachmentPointLocationOutput:
         self.type = OutputType(data.get("type", OutputType.VECTOR.value))
         self.input_location = data.get("inputLocation", data.get("inputs", "vec3(0, 0, 0)"))
         self.input_rotation = data.get("inputRotation", data.get("inputs", "vec3(0, 0, 0)"))
+        child_data = data.get("child")
+        self.child = AttachmentPointChild(child_data) if isinstance(child_data, dict) else None
         self.comment = data.get("comment")
 
 class ValueOutput:

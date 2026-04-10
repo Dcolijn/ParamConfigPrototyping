@@ -21,32 +21,13 @@
       "default": 32
     }
   ],
-  "expressions": [
-    {
-      "id": "$ap-corner-right-location",
-      "type": "vector",
-      "inputs": ["$countertop-depth", "$countertop-width"],
-      "expression": "vec3($countertop-depth / 2 / 1000, $countertop-width / 2 / 1000, 0)"
-    },
-    {
-      "id": "$ap-corner-left-location",
-      "type": "vector",
-      "inputs": ["$countertop-depth", "$countertop-width"],
-      "expression": "vec3($countertop-depth / 1000, 0, 0)"
-    }
-  ],
+  "expressions": [],
   "parts": ["counter-top_corner_main", "counter-top_corner_edge_overflow"],
   "attachmentPoints": [
     {
-      "id": "ap-corner-right",
+      "id": "ap-corner-origin",
       "type": "vector",
-      "inputLocation": "$ap-corner-right-location",
-      "inputRotation": "vec3(0, 0, 0)"
-    },
-    {
-      "id": "ap-corner-left",
-      "type": "vector",
-      "inputLocation": "$ap-corner-left-location",
+      "inputLocation": "vec3(0, 0, 0)",
       "inputRotation": "vec3(0, 0, 0)"
     }
   ],

@@ -1,7 +1,8 @@
 import json
 import re
+from math import radians
 import bpy
-from mathutils import Vector
+from mathutils import Matrix, Vector
 
 from .configurationData import ConfigurationData, InputType
 
@@ -261,19 +262,41 @@ def _coerce_vec3_tuple(value, fallback=(0.0, 0.0, 0.0)):
     return fallback
 
 
+def _parent_object_keep_world(child_object, parent_object):
+    """Parent child_object to parent_object while preserving world transform."""
+    if child_object is None or parent_object is None:
+        return
+
+    if child_object == parent_object:
+        return
+
+    world_matrix = child_object.matrix_world.copy()
+    child_object.parent = parent_object
+    child_object.matrix_parent_inverse = parent_object.matrix_world.inverted()
+    child_object.matrix_world = world_matrix
+
+
 def _ensure_attachment_point_child(root_object, attachment_id: str):
     """Create or reuse a child empty that represents one attachment point."""
     for child in root_object.children:
         if child.get("parametric_attachment_point_id") == attachment_id:
-            if child.parent != root_object:
-                child.parent = root_object
+            child["parametric_attachment_point_owner_name"] = root_object.name
+            child["parametric_attachment_point_id"] = attachment_id
             return child
+
+    for obj in bpy.data.objects:
+        if obj.get("parametric_attachment_point_id") != attachment_id:
+            continue
+        if obj.get("parametric_attachment_point_owner_name") != root_object.name:
+            continue
+        return obj
 
     attachment_object = bpy.data.objects.new(attachment_id, None)
     attachment_object.empty_display_type = 'ARROWS'
     attachment_object.empty_display_size = 0.1
     attachment_object.parent = root_object
     attachment_object["parametric_attachment_point_id"] = attachment_id
+    attachment_object["parametric_attachment_point_owner_name"] = root_object.name
 
     root_collections = list(root_object.users_collection)
     if len(root_collections) > 0:
@@ -296,48 +319,199 @@ def _sync_attachment_points(root_object, attachment_points: dict):
 
         active_ids.add(attachment_id)
         attachment_object = _ensure_attachment_point_child(root_object, attachment_id)
+        attachment_object["parametric_attachment_point_owner_name"] = root_object.name
+
+        if attachment_object.parent != root_object:
+            attachment_object.parent = root_object
+            attachment_object.matrix_parent_inverse = root_object.matrix_world.inverted()
 
         location = _coerce_vec3_tuple(transform.get("location") if isinstance(transform, dict) else None)
         rotation = _coerce_vec3_tuple(transform.get("rotation") if isinstance(transform, dict) else None)
+        rotation_radians = (
+            radians(rotation[0]),
+            radians(rotation[1]),
+            radians(rotation[2]),
+        )
 
         attachment_object.location = location
-        attachment_object.rotation_euler = rotation
+        attachment_object.rotation_euler = rotation_radians
 
     stale_children = []
-    for child in root_object.children:
-        attachment_id = child.get("parametric_attachment_point_id")
+    for obj in bpy.data.objects:
+        attachment_id = obj.get("parametric_attachment_point_id")
+        owner_name = obj.get("parametric_attachment_point_owner_name")
+        if owner_name != root_object.name:
+            continue
         if attachment_id and attachment_id not in active_ids:
-            stale_children.append(child)
+            stale_children.append(obj)
 
     for child in stale_children:
         bpy.data.objects.remove(child, do_unlink=True)
 
 
+def _apply_attachment_point_connections(obj_by_name: dict):
+    """Align child PME roots so target AP world transforms match source APs."""
+    connected_objects = []
+
+    def _connection_depth(target_object):
+        depth = 0
+        current_name = str(target_object.get("parametric_parent_object_name", "")).strip()
+        visited = set()
+
+        while current_name and current_name not in visited:
+            visited.add(current_name)
+            parent_obj = obj_by_name.get(current_name)
+            if parent_obj is None:
+                break
+            depth += 1
+            current_name = str(parent_obj.get("parametric_parent_object_name", "")).strip()
+
+        return depth
+
+    for obj in bpy.data.objects:
+        if not obj.get("parametric_configuration_data_json"):
+            continue
+
+        source_owner_name = str(obj.get("parametric_ap_source_object_name", "")).strip()
+        source_ap_id = str(obj.get("parametric_ap_source_id", "")).strip()
+        target_ap_id = str(obj.get("parametric_ap_target_id", "")).strip()
+
+        if not source_owner_name or not source_ap_id or not target_ap_id:
+            continue
+
+        connected_objects.append(obj)
+
+    connected_objects.sort(key=_connection_depth)
+
+    for obj in connected_objects:
+        source_owner_name = str(obj.get("parametric_ap_source_object_name", "")).strip()
+        source_ap_id = str(obj.get("parametric_ap_source_id", "")).strip()
+        target_ap_id = str(obj.get("parametric_ap_target_id", "")).strip()
+
+        source_owner = obj_by_name.get(source_owner_name)
+        if source_owner is None:
+            continue
+
+        source_ap = _ensure_attachment_point_child(source_owner, source_ap_id)
+        target_ap = _ensure_attachment_point_child(obj, target_ap_id)
+
+        if source_ap is None or target_ap is None:
+            continue
+
+        if target_ap.parent != obj:
+            target_ap.parent = obj
+            target_ap.matrix_parent_inverse = obj.matrix_world.inverted()
+
+        try:
+            target_local_inverse = target_ap.matrix_basis.inverted()
+        except ValueError:
+            continue
+
+        source_ap_world = source_owner.matrix_world @ source_ap.matrix_basis
+        obj.matrix_world = source_ap_world @ target_local_inverse
+
+
+def _build_effective_inputs_for_object(obj, base_input_values: dict, obj_by_name: dict) -> dict:
+    """Merge window-manager inputs with any values cascaded from a parent PME.
+
+    If *obj* carries 'parametric_linked_inputs_json', each mapping entry
+    ``{child_input_id: parent_expression_id}`` is resolved against the parent's
+    already-evaluated expressions/output-values and injected into a copy of
+    *base_input_values*, overriding whatever the user may have set directly.
+    """
+    effective = dict(base_input_values)
+
+    linked_raw = obj.get("parametric_linked_inputs_json")
+    if not linked_raw:
+        return effective
+
+    try:
+        mapping = json.loads(linked_raw)
+    except (TypeError, json.JSONDecodeError):
+        return effective
+
+    if not isinstance(mapping, dict):
+        return effective
+
+    parent_name = obj.get("parametric_parent_object_name", "")
+    parent_obj = obj_by_name.get(parent_name)
+    if parent_obj is None:
+        return effective
+
+    parent_raw = parent_obj.get("parametric_evaluated_outputs_json")
+    if not parent_raw:
+        return effective
+
+    try:
+        parent_evaluated = json.loads(parent_raw)
+    except (TypeError, json.JSONDecodeError):
+        return effective
+
+    parent_expressions = parent_evaluated.get("expressions", {})
+    parent_output_values = parent_evaluated.get("outputs", {}).get("values", {})
+
+    for child_input_id, parent_ref_id in mapping.items():
+        # Resolve from parent expressions first, then from parent output values,
+        # then from base_input_values (in case it's a direct parent input).
+        if parent_ref_id in parent_expressions:
+            v = parent_expressions[parent_ref_id]
+        elif parent_ref_id in parent_output_values:
+            v = parent_output_values[parent_ref_id]
+        elif parent_ref_id in base_input_values:
+            v = base_input_values[parent_ref_id]
+        else:
+            continue
+
+        if isinstance(v, (int, float)):
+            effective[child_input_id] = float(v)
+
+    return effective
+
+
 def recalculate_outputs_for_scene(context):
-    input_values = _input_values_from_window_manager(context.window_manager)
+    base_input_values = _input_values_from_window_manager(context.window_manager)
+
+    # Build a fast name→object lookup used for parent resolution.
+    obj_by_name = {obj.name: obj for obj in context.scene.objects}
+
+    # Separate parametric objects into roots (no parent PME) and children so
+    # that parents are always evaluated before the children that depend on them.
+    root_objects = []
+    child_objects = []
 
     for obj in context.scene.objects:
+        if not obj.get("parametric_configuration_data_json"):
+            continue
+        if obj.get("parametric_parent_object_name"):
+            child_objects.append(obj)
+        else:
+            root_objects.append(obj)
+
+    def _process_parametric_object(obj):
         raw_json = obj.get("parametric_configuration_data_json")
         if not raw_json:
-            continue
+            return
 
         try:
             data = json.loads(raw_json)
         except (TypeError, json.JSONDecodeError):
-            continue
+            return
 
         if not isinstance(data, dict):
-            continue
+            return
 
         try:
             config_data = ConfigurationData(data)
         except Exception:
-            continue
+            return
 
         if config_data is None:
-            continue
+            return
 
-        evaluated = evaluate_configuration(config_data, input_values)
+        # Build this object's effective inputs (with parent overrides if any).
+        effective_inputs = _build_effective_inputs_for_object(obj, base_input_values, obj_by_name)
+
+        evaluated = evaluate_configuration(config_data, effective_inputs)
         obj["parametric_evaluated_outputs_json"] = json.dumps(evaluated)
 
         shapekeys = evaluated["outputs"]["shapekeys"]
@@ -350,3 +524,17 @@ def recalculate_outputs_for_scene(context):
             _sync_attachment_points(obj, attachment_points)
         else:
             _apply_shapekeys_to_object(obj, shapekeys)
+
+    # Evaluate roots first so their outputs are available for child cascading.
+    for obj in root_objects:
+        _process_parametric_object(obj)
+
+    # Evaluate children (one level deep is fine for the current architecture;
+    # multi-level nesting works because each child reads its parent's stored
+    # outputs which were written in the root pass above).
+    for obj in child_objects:
+        _process_parametric_object(obj)
+
+    # Apply AP-level hierarchy links after all PME AP empties are up to date.
+    _apply_attachment_point_connections(obj_by_name)
+
