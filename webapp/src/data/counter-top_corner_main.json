@@ -1,0 +1,77 @@
+{
+  "type": "part",
+  "input": [
+    {
+      "id": "$countertop-corner-width",
+      "type": "number",
+      "default": 700,
+      "min": 200,
+      "max": 2000
+    },
+    {
+      "id": "$countertop-corner-depth",
+      "type": "number",
+      "default": 700,
+      "min": 200,
+      "max": 2000
+    },
+    {
+      "id": "$countertop-corner-height",
+      "type": "number",
+      "default": 20,
+      "min": 20,
+      "max": 32
+    }
+  ],
+  "expressions": [
+    {
+      "id": "$ap-countertop-corner-left-location",
+      "type": "vector",
+      "inputs": ["$countertop-corner-corner-depth", "$countertop-corner-width"],
+      "expression": "vec3($countertop-corner-depth / 2, -$countertop-corner-width / 2, 0)"
+    },
+    {
+      "id": "$ap-countertop-corner-right-location",
+      "type": "vector",
+      "inputs": ["$countertop-corner-depth", "$countertop-corner-width"],
+      "expression": "vec3(0, $countertop-corner-depth, 0)"
+    }
+  ],
+  "output": {
+    "shapekeys": [
+      {
+        "id": "$shape-width",
+        "type": "shapekey",
+        "inputs": "$countertop-corner-width",
+        "conversion": "($countertop-corner-width - 1000) / 1000"
+      },
+      {
+        "id": "$shape-depth",
+        "type": "shapekey",
+        "inputs": "$countertop-corner-depth",
+        "conversion": "($countertop-corner-depth - 1000) / 1000"
+      },
+      {
+        "id": "$shape-height",
+        "type": "shapekey",
+        "inputs": "$countertop-corner-height",
+        "conversion": "($countertop-corner-height - 20) / 12"
+      }
+    ],
+    "attachmentPoints": [
+      {
+        "id": "ap-countertop-corner-left-location",
+        "type": "vector",
+        "inputLocation": "$ap-countertop-corner-left-location",
+        "inputRotation": "vec3(0, 0, 0)"
+      },
+      {
+        "id": "ap-countertop-corner-right-location",
+        "type": "vector",
+        "inputLocation": "$ap-countertop-corner-right-location",
+        "inputRotation": "vec3(0, 0, 0)"
+      }
+    ],
+    "values": []
+  }
+}

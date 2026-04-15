@@ -1,0 +1,64 @@
+{
+  "type": "part",
+  "input": [
+    {
+      "id": "$countertop-corner-width",
+      "type": "number",
+      "default": 700,
+      "min": 200,
+      "max": 2000
+    },
+    {
+      "id": "$countertop-corner-depth",
+      "type": "number",
+      "default": 700,
+      "min": 200,
+      "max": 2000
+    },
+    {
+      "id": "$countertop-corner-height",
+      "type": "number",
+      "default": 20,
+      "min": 20,
+      "max": 32
+    },
+    {
+      "id": "$countertop-corner-overhang",
+      "type": "number",
+      "default": 0,
+      "min": 0,
+      "max": 28
+    }
+  ],
+  "expressions": [],
+  "output": {
+    "shapekeys": [
+      {
+        "id": "$shape-width",
+        "type": "shapekey",
+        "inputs": "$countertop-corner-width",
+        "conversion": "($countertop-corner-width - 1000) / 1000"
+      },
+      {
+        "id": "$shape-depth",
+        "type": "shapekey",
+        "inputs": "$countertop-corner-depth",
+        "conversion": "($countertop-corner-depth - 1000) / 1000"
+      },
+      {
+        "id": "$shape-height",
+        "type": "shapekey",
+        "inputs": "$countertop-corner-height",
+        "conversion": "($countertop-corner-height - 20) / 12"
+      },
+      {
+        "id": "$shape-overhang",
+        "type": "shapekey",
+        "inputs": "$countertop-corner-overhang",
+        "conversion": "$countertop-corner-overhang / 28"
+      }
+    ],
+    "attachmentPoints": [],
+    "values": []
+  }
+}
