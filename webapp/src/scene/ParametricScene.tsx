@@ -9,9 +9,14 @@ import AttachmentPointsLayer from './AttachmentPointsLayer'
 import type { LoadedPbrPackage } from './pbrPackage'
 
 interface ParametricSceneProps {
-  partNames: string[]
-  modelUrlsByPart: Record<string, string>
-  shapekeys: EvaluationResult['outputs']['shapekeys']
+  partInstances: Array<{
+    key: string
+    partName: string
+    url: string
+    shapekeys: EvaluationResult['outputs']['shapekeys']
+    position: [number, number, number]
+    rotation: [number, number, number]
+  }>
   attachmentPoints: EvaluationResult['outputs']['attachment_points']
   onMorphTargetWarningsChange?: (warnings: string[]) => void
   pbrPackage: LoadedPbrPackage | null
@@ -23,6 +28,8 @@ interface ModelPartProps {
   partName: string
   index: number
   shapekeys: EvaluationResult['outputs']['shapekeys']
+  position?: [number, number, number]
+  rotation?: [number, number, number]
   pbrPackage: LoadedPbrPackage | null
   pbrRepeat: number
   onWarningsChange: (partName: string, warnings: string[]) => void
@@ -141,7 +148,7 @@ function SceneEnvironment({ pbrPackage }: { pbrPackage: LoadedPbrPackage | null 
   return null
 }
 
-function ModelPart({ url, partName, index, shapekeys, pbrPackage, pbrRepeat, onWarningsChange }: ModelPartProps) {
+function ModelPart({ url, partName, index, shapekeys, position, rotation, pbrPackage, pbrRepeat, onWarningsChange }: ModelPartProps) {
   const { scene } = useGLTF(url)
   const { invalidate } = useThree()
   const sceneInstance = useMemo(() => scene.clone(), [scene])
@@ -215,7 +222,14 @@ function ModelPart({ url, partName, index, shapekeys, pbrPackage, pbrRepeat, onW
     onWarningsChange(partName, warnings)
   }, [invalidate, onWarningsChange, partName, shapekeys])
 
-  return <primitive object={sceneInstance} position={[0, index * 0.001, 0]} name={partName} />
+  return (
+    <primitive
+      object={sceneInstance}
+      position={position ?? [0, index * 0.001, 0]}
+      rotation={rotation ?? [0, 0, 0]}
+      name={partName}
+    />
+  )
 }
 
 function RenderOnAttachmentChange({ attachmentPoints }: { attachmentPoints: EvaluationResult['outputs']['attachment_points'] }) {
@@ -242,16 +256,14 @@ function CameraControls() {
 }
 
 export default function ParametricScene({
-  partNames,
-  modelUrlsByPart,
-  shapekeys,
+  partInstances,
   attachmentPoints,
   onMorphTargetWarningsChange,
   pbrPackage,
   pbrRepeat,
 }: ParametricSceneProps) {
-  const safePartNames = partNames.filter((partName) => partName.trim().length > 0)
-  const safePartNamesKey = useMemo(() => safePartNames.join('|'), [safePartNames])
+  const safePartInstances = partInstances.filter((entry) => entry.partName.trim().length > 0 && entry.url.trim().length > 0)
+  const safePartNamesKey = useMemo(() => safePartInstances.map((entry) => entry.key).join('|'), [safePartInstances])
   const warningsByPartRef = useRef<Record<string, string[]>>({})
 
   useEffect(() => {
@@ -281,21 +293,16 @@ export default function ParametricScene({
 
       <Suspense fallback={null}>
         <group>
-          {safePartNames.map((partName, index) => {
-            const url = modelUrlsByPart[partName]
-
-            if (!url) {
-              console.warn(`[ParametricScene] Geen model ingeladen voor part "${partName}".`)
-              return null
-            }
-
+          {safePartInstances.map((instance, index) => {
             return (
-              <group key={partName}>
+              <group key={instance.key}>
                 <ModelPart
-                  partName={partName}
-                  url={url}
+                  partName={instance.partName}
+                  url={instance.url}
                   index={index}
-                  shapekeys={shapekeys}
+                  shapekeys={instance.shapekeys}
+                  position={instance.position}
+                  rotation={instance.rotation}
                   pbrPackage={pbrPackage}
                   pbrRepeat={pbrRepeat}
                   onWarningsChange={handleWarningsChange}

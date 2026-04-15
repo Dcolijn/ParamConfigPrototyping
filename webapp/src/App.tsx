@@ -1,16 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { ChangeEvent } from 'react'
+import { Euler, Matrix4, Quaternion, Vector3 } from 'three'
 import ParametricInputsPanel from './components/ParametricInputsPanel'
 import DebugPanel from './components/DebugPanel'
 import PMESelector from './components/PMESelector'
 import { loadConfigurationDataFromJson } from './engine/configurationData'
 import { prepareEvaluator, runEvaluator } from './engine/evaluator'
-import type { ConfigurationData } from './engine/types'
+import type { ConfigurationData, EvaluationResult, Vec3 } from './engine/types'
 import ParametricScene from './scene/ParametricScene'
 import { loadIone3dPackage, type LoadedPbrPackage } from './scene/pbrPackage'
 import './App.css'
 
 type InputValue = number | boolean
+type RawJson = Record<string, unknown>
+
+interface RuntimePmeNode {
+  instanceId: string
+  elementId: string
+  config: ConfigurationData
+  parentInstanceId: string | null
+  sourceAttachmentId: string | null
+  targetAttachmentId: string | null
+  linkedInputMapping: Record<string, string>
+}
 
 const PME_OPTIONS = ['PME_counter-top_straight_sink.json', 'PME_counter-top_corner_sink.json']
 
@@ -23,14 +35,20 @@ const buildInitialInputs = (configuration: ConfigurationData): Record<string, In
     ]),
   )
 
-const buildModelUrlsByPart = (partNames: string[]): Record<string, string> =>
-  Object.fromEntries(partNames.map((partName) => [partName, `/parts/${partName}.glb`]))
+const normalizeMappedInputId = (value: string): string => (value.startsWith('$') ? value : `$${value}`)
+
+const composeMatrixFromAttachment = (attachment?: { location: Vec3; rotation: Vec3 }): Matrix4 =>
+  attachment
+    ? new Matrix4().makeRotationFromEuler(
+        new Euler((attachment.rotation[0] * Math.PI) / 180, (attachment.rotation[1] * Math.PI) / 180, (attachment.rotation[2] * Math.PI) / 180, 'XYZ'),
+      ).setPosition(new Vector3(attachment.location[0], attachment.location[1], attachment.location[2]))
+    : new Matrix4().identity()
 
 export default function App() {
   const [selectedPme, setSelectedPme] = useState(PME_OPTIONS[0])
   const [configuration, setConfiguration] = useState<ConfigurationData | null>(null)
+  const [runtimeNodes, setRuntimeNodes] = useState<RuntimePmeNode[]>([])
   const [inputValues, setInputValues] = useState<Record<string, InputValue>>({})
-  const [modelUrlsByPart, setModelUrlsByPart] = useState<Record<string, string>>({})
   const [isLoadingConfig, setIsLoadingConfig] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [morphWarnings, setMorphWarnings] = useState<string[]>([])
@@ -53,23 +71,86 @@ export default function App() {
         }
 
         const jsonText = await response.text()
-        const parsedConfiguration = loadConfigurationDataFromJson(jsonText)
+        const rootRaw = JSON.parse(jsonText) as RawJson
+        const rootElementId = selectedPme.replace(/\.json$/i, '')
+        const nodes: RuntimePmeNode[] = []
+        const visit = async (
+          elementId: string,
+          raw: RawJson,
+          parentInstanceId: string | null,
+          sourceAttachmentId: string | null,
+          targetAttachmentId: string | null,
+          linkedInputMapping: Record<string, string>,
+          depth = 0,
+          ancestry: string[] = [],
+        ) => {
+          if (depth > 10 || ancestry.includes(elementId)) return
+          const config = loadConfigurationDataFromJson(JSON.stringify(raw))
+          const instanceId = `${elementId}__${nodes.length}`
+          nodes.push({ instanceId, elementId, config, parentInstanceId, sourceAttachmentId, targetAttachmentId, linkedInputMapping })
+
+          const rootAttachmentPoints = (Array.isArray(raw.attachmentPoints)
+            ? raw.attachmentPoints
+            : (raw.output as RawJson | undefined)?.attachmentPoints ?? (raw.output as RawJson | undefined)?.attachmentpoints) as unknown[]
+
+          for (const apRaw of Array.isArray(rootAttachmentPoints) ? rootAttachmentPoints : []) {
+            if (!apRaw || typeof apRaw !== 'object') continue
+            const ap = apRaw as RawJson
+            const childRaw = ap.child as RawJson | undefined
+            if (!childRaw || typeof childRaw !== 'object') continue
+            const childElementId = typeof childRaw.elementId === 'string' ? childRaw.elementId.trim() : ''
+            if (!childElementId) continue
+            const childResponse = await fetch(`/configs/${childElementId}.json`)
+            if (!childResponse.ok) continue
+            const childText = await childResponse.text()
+            const childJson = JSON.parse(childText) as RawJson
+            const mappingRaw = (childRaw.outputValueMapping ?? {}) as Record<string, unknown>
+            const mapping: Record<string, string> = {}
+            Object.entries(mappingRaw).forEach(([key, value]) => {
+              if (typeof value === 'string') mapping[normalizeMappedInputId(key)] = value
+            })
+            await visit(
+              childElementId,
+              childJson,
+              instanceId,
+              typeof ap.id === 'string' ? ap.id : null,
+              typeof childRaw.targetId === 'string' ? childRaw.targetId : null,
+              mapping,
+              depth + 1,
+              [...ancestry, elementId],
+            )
+          }
+        }
+
+        await visit(rootElementId, rootRaw, null, null, null, {})
+        const parsedConfiguration = nodes[0]?.config ?? loadConfigurationDataFromJson(jsonText)
 
         if (!isCurrent) {
           return
         }
 
         // Bij wisselen van PME resetten we alles: inputs terug naar defaults + juiste part-bestanden koppelen.
-        setConfiguration(parsedConfiguration)
-        setInputValues(buildInitialInputs(parsedConfiguration))
-        setModelUrlsByPart(buildModelUrlsByPart(parsedConfiguration.parts ?? []))
+        setRuntimeNodes(nodes)
+        const mergedInputs: ConfigurationData['input'] = []
+        const seen = new Set<string>()
+        for (const node of nodes) {
+          const linkedKeys = new Set(Object.keys(node.linkedInputMapping))
+          for (const input of node.config.input) {
+            if (linkedKeys.has(input.id) || seen.has(input.id)) continue
+            seen.add(input.id)
+            mergedInputs.push(input)
+          }
+        }
+        const syntheticRootConfig: ConfigurationData = { ...parsedConfiguration, input: mergedInputs }
+        setConfiguration(syntheticRootConfig)
+        setInputValues(buildInitialInputs(syntheticRootConfig))
       } catch (error) {
         if (!isCurrent) {
           return
         }
         setConfiguration(null)
+        setRuntimeNodes([])
         setInputValues({})
-        setModelUrlsByPart({})
         setLoadError(error instanceof Error ? error.message : 'Onbekende fout tijdens laden van JSON.')
       } finally {
         if (isCurrent) {
@@ -92,24 +173,103 @@ export default function App() {
   }, [pbrPackage])
 
   const preparedEvaluator = useMemo(() => {
-    if (!configuration) {
+    if (!runtimeNodes.length) {
       return null
     }
+    return runtimeNodes.map((node) => ({ node, prepared: prepareEvaluator(node.config) }))
+  }, [runtimeNodes])
 
-    // In gewone taal: we bouwen de "rekenmachine-voorbereiding" 1x per configuratie op.
-    // Zo hoeft bij veel slider-events niet telkens opnieuw geparsed/getokenized te worden, wat CPU-pieken voorkomt.
-    return prepareEvaluator(configuration)
-  }, [configuration])
-
-  const evaluation = useMemo(() => {
+  const evaluation = useMemo<{
+    root: EvaluationResult | null
+    partInstances: Array<{ key: string; partName: string; url: string; shapekeys: EvaluationResult['outputs']['shapekeys']; position: Vec3; rotation: Vec3 }>
+    worldAttachmentPoints: EvaluationResult['outputs']['attachment_points']
+  }>(() => {
     if (!preparedEvaluator) {
-      return null
+      return { root: null, partInstances: [], worldAttachmentPoints: {} }
     }
-    // In gewone taal: bij schuiven rekenen we nu alleen met nieuwe waardes, met hergebruik van de voorbereide data.
-    return runEvaluator(preparedEvaluator, inputValues)
-  }, [preparedEvaluator, inputValues])
+    const evalById: Record<string, EvaluationResult> = {}
+    const worldMatrixById: Record<string, Matrix4> = {}
+    const worldAttachmentPoints: EvaluationResult['outputs']['attachment_points'] = {}
 
-  const partNames = configuration?.parts ?? []
+    const depthFor = (instanceId: string): number => {
+      let depth = 0
+      const seen = new Set<string>()
+      let current = preparedEvaluator.find((entry) => entry.node.instanceId === instanceId)?.node
+      while (current?.parentInstanceId && !seen.has(current.parentInstanceId)) {
+        seen.add(current.parentInstanceId)
+        depth += 1
+        current = preparedEvaluator.find((entry) => entry.node.instanceId === current?.parentInstanceId)?.node
+      }
+      return depth
+    }
+    const depthSorted = [...preparedEvaluator].sort((a, b) => depthFor(a.node.instanceId) - depthFor(b.node.instanceId))
+
+    for (const entry of depthSorted) {
+      const { node, prepared } = entry
+      const effectiveInputs: Record<string, unknown> = { ...inputValues }
+      if (node.parentInstanceId) {
+        const parentEval = evalById[node.parentInstanceId]
+        if (parentEval) {
+          Object.entries(node.linkedInputMapping).forEach(([childInputId, parentRefId]) => {
+            const v =
+              parentEval.expressions[parentRefId] ??
+              parentEval.outputs.values[parentRefId] ??
+              (inputValues as Record<string, unknown>)[parentRefId]
+            if (typeof v === 'number' || typeof v === 'boolean') effectiveInputs[childInputId] = v
+          })
+        }
+      }
+      const evaluated = runEvaluator(prepared, effectiveInputs)
+      evalById[node.instanceId] = evaluated
+
+      let worldMatrix = new Matrix4().identity()
+      if (node.parentInstanceId) {
+        const parentMatrix = worldMatrixById[node.parentInstanceId] ?? new Matrix4().identity()
+        const parentEval = evalById[node.parentInstanceId]
+        const sourceAp = node.sourceAttachmentId ? parentEval?.outputs.attachment_points[node.sourceAttachmentId] : undefined
+        const targetAp = node.targetAttachmentId ? evaluated.outputs.attachment_points[node.targetAttachmentId] : undefined
+        const sourceMatrix = composeMatrixFromAttachment(sourceAp)
+        const targetMatrix = composeMatrixFromAttachment(targetAp)
+        const targetInverse = new Matrix4().copy(targetMatrix).invert()
+        worldMatrix = new Matrix4().multiplyMatrices(parentMatrix, new Matrix4().multiplyMatrices(sourceMatrix, targetInverse))
+      }
+      worldMatrixById[node.instanceId] = worldMatrix
+
+      Object.entries(evaluated.outputs.attachment_points).forEach(([id, ap]) => {
+        const local = composeMatrixFromAttachment(ap)
+        const world = new Matrix4().multiplyMatrices(worldMatrix, local)
+        const pos = new Vector3()
+        const quat = new Quaternion()
+        const scale = new Vector3()
+        world.decompose(pos, quat, scale)
+        const rot = new Euler().setFromQuaternion(quat, 'XYZ')
+        worldAttachmentPoints[`${node.instanceId}:${id}`] = {
+          location: [pos.x, pos.y, pos.z],
+          rotation: [(rot.x * 180) / Math.PI, (rot.y * 180) / Math.PI, (rot.z * 180) / Math.PI],
+        }
+      })
+    }
+
+    const partInstances = preparedEvaluator.flatMap(({ node }) => {
+      const evalResult = evalById[node.instanceId]
+      const matrix = worldMatrixById[node.instanceId] ?? new Matrix4().identity()
+      const pos = new Vector3()
+      const quat = new Quaternion()
+      const scale = new Vector3()
+      matrix.decompose(pos, quat, scale)
+      const rot = new Euler().setFromQuaternion(quat, 'XYZ')
+      return (node.config.parts ?? []).map((partName) => ({
+        key: `${node.instanceId}:${partName}`,
+        partName,
+        url: `/parts/${partName}.glb`,
+        shapekeys: evalResult?.outputs.shapekeys ?? {},
+        position: [pos.x, pos.y, pos.z] as Vec3,
+        rotation: [rot.x, rot.y, rot.z] as Vec3,
+      }))
+    })
+
+    return { root: evalById[preparedEvaluator[0].node.instanceId] ?? null, partInstances, worldAttachmentPoints }
+  }, [preparedEvaluator, inputValues])
 
   const handleInputChange = (id: string, value: InputValue) => {
     setInputValues((previous) => ({ ...previous, [id]: value }))
@@ -180,10 +340,8 @@ export default function App() {
 
         <div className="canvas-wrapper">
           <ParametricScene
-            partNames={partNames}
-            modelUrlsByPart={modelUrlsByPart}
-            shapekeys={evaluation?.outputs.shapekeys ?? {}}
-            attachmentPoints={evaluation?.outputs.attachment_points ?? {}}
+            partInstances={evaluation.partInstances}
+            attachmentPoints={evaluation.worldAttachmentPoints}
             onMorphTargetWarningsChange={setMorphWarnings}
             pbrPackage={pbrPackage}
             pbrRepeat={pbrRepeat}
@@ -191,7 +349,7 @@ export default function App() {
         </div>
       </section>
 
-      {evaluation ? <DebugPanel inputValues={inputValues} evaluation={evaluation} morphWarnings={morphWarnings} /> : null}
+      {evaluation.root ? <DebugPanel inputValues={inputValues} evaluation={evaluation.root} morphWarnings={morphWarnings} /> : null}
     </main>
   )
 }

@@ -858,6 +858,7 @@ def _load_pme_children_recursive(
     blend_by_stem: dict,
     collection,
     depth: int = 0,
+    ancestry: tuple[str, ...] = (),
 ):
     """Recursively load child PMEs referenced by attachment point 'child' entries.
 
@@ -870,7 +871,14 @@ def _load_pme_children_recursive(
     if depth > 10:
         return
 
-    attachment_points = pme_data.get("attachmentPoints", [])
+    attachment_points = pme_data.get("attachmentPoints")
+    if not isinstance(attachment_points, list):
+        output = pme_data.get("output", {})
+        if isinstance(output, dict):
+            attachment_points = output.get("attachmentPoints", output.get("attachmentpoints", []))
+        else:
+            attachment_points = []
+
     if not isinstance(attachment_points, list):
         return
 
@@ -884,6 +892,9 @@ def _load_pme_children_recursive(
 
         element_id = child_info.get("elementId", "").strip()
         if not element_id:
+            continue
+        if element_id in ancestry:
+            # Prevent accidental recursive include loops across PME files.
             continue
 
         output_value_mapping = child_info.get("outputValueMapping", {})
@@ -944,6 +955,7 @@ def _load_pme_children_recursive(
             blend_by_stem,
             collection,
             depth + 1,
+            ancestry + (element_id,),
         )
 
 

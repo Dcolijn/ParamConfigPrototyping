@@ -474,18 +474,24 @@ def recalculate_outputs_for_scene(context):
     # Build a fast name→object lookup used for parent resolution.
     obj_by_name = {obj.name: obj for obj in context.scene.objects}
 
-    # Separate parametric objects into roots (no parent PME) and children so
-    # that parents are always evaluated before the children that depend on them.
-    root_objects = []
-    child_objects = []
+    # Evaluate parametric objects in parent-depth order so nested PME chains
+    # (root -> child -> grandchild) always see already-computed parent outputs.
+    parametric_objects = [obj for obj in context.scene.objects if obj.get("parametric_configuration_data_json")]
 
-    for obj in context.scene.objects:
-        if not obj.get("parametric_configuration_data_json"):
-            continue
-        if obj.get("parametric_parent_object_name"):
-            child_objects.append(obj)
-        else:
-            root_objects.append(obj)
+    def _parent_depth(obj):
+        depth = 0
+        visited = set()
+        parent_name = str(obj.get("parametric_parent_object_name", "")).strip()
+
+        while parent_name and parent_name not in visited:
+            visited.add(parent_name)
+            parent_obj = obj_by_name.get(parent_name)
+            if parent_obj is None:
+                break
+            depth += 1
+            parent_name = str(parent_obj.get("parametric_parent_object_name", "")).strip()
+
+        return depth
 
     def _process_parametric_object(obj):
         raw_json = obj.get("parametric_configuration_data_json")
@@ -525,16 +531,8 @@ def recalculate_outputs_for_scene(context):
         else:
             _apply_shapekeys_to_object(obj, shapekeys)
 
-    # Evaluate roots first so their outputs are available for child cascading.
-    for obj in root_objects:
-        _process_parametric_object(obj)
-
-    # Evaluate children (one level deep is fine for the current architecture;
-    # multi-level nesting works because each child reads its parent's stored
-    # outputs which were written in the root pass above).
-    for obj in child_objects:
+    for obj in sorted(parametric_objects, key=_parent_depth):
         _process_parametric_object(obj)
 
     # Apply AP-level hierarchy links after all PME AP empties are up to date.
     _apply_attachment_point_connections(obj_by_name)
-
