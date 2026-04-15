@@ -20,10 +20,8 @@
     {
       "id": "$countertop-height",
       "name": "Countertop Height",
-      "type": "number",
-      "default": 20,
-      "min": 20,
-      "max": 32
+      "type": "variable",
+      "default": 32
     },
     {
       "id": "$sink-width",
@@ -68,14 +66,6 @@
       "name": "Margin Faucet-Sink",
       "type": "variable",
       "default": 50
-    },
-    {
-      "id": "$countertop-overhang",
-      "name": "Countertop Overhang",
-      "type": "number",
-      "default": 0,
-      "min": 0,
-      "max": 28
     }
   ],
   "expressions": [
@@ -102,13 +92,13 @@
         "$faucet-size",
         "$sink-depth"
       ],
-      "expression": "vec3(((($countertop-depth - $sink-depth) / 2) - $margin-faucet-sink - ($faucet-size / 2)) / 1000, $sink-location/1000, $countertop-height/1000)"
+      "expression": "vec3(((($countertop-depth - $sink-depth) / 2) - $margin-faucet-sink - ($faucet-size / 2)) / 1000, -$sink-location/1000, $countertop-height/1000)"
     },
     {
       "id": "$ap-sink-location",
       "type": "vector",
       "inputs": ["$countertop-depth", "$sink-location", "$countertop-height"],
-      "expression": "vec3($countertop-depth / 2 / 1000, $sink-location / 1000, $countertop-height / 1000)"
+      "expression": "vec3($countertop-depth / 2 / 1000, -$sink-location / 1000, $countertop-height / 1000)"
     },
     {
       "id": "$max-sink-width",
@@ -182,7 +172,7 @@
       "expression": "max(($sink-depth + 2 * $margin-faucet-sink + $faucet-size + 2 * $countertop-margin), $sink-depth.min)"
     }
   ],
-  "parts": ["counter-top_main", "counter-top_edge_straight"],
+  "parts": ["counter-top_main", "counter-top_edge_overflow"],
   "attachmentPoints": [
     {
       "id": "ap-faucet-location",
@@ -266,12 +256,6 @@
         "type": "shapekey",
         "inputs": "$faucet-size",
         "conversion": "$faucet-size / 30"
-      },
-      {
-        "id": "$shape-overhang",
-        "type": "shapekey",
-        "inputs": "$countertop-overhang",
-        "conversion": "$countertop-overhang / 28"
       }
     ],
     "values": [
