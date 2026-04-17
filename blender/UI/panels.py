@@ -123,32 +123,50 @@ class DIM_PT_ParametricInputs(Panel):
             layout.label(text="No loaded inputs found.", icon='INFO')
             return
 
-        layout.label(text="Unique inputs:")
-        
+        # Group items by source_pme_id for clarity when nested PMEs are loaded.
+        # Items without a source (or matching the root) are treated as root inputs.
+        from collections import defaultdict
+        groups: dict[str, list] = defaultdict(list)
+        variables: dict[str, list] = defaultdict(list)
+
         for item in input_items:
-            label = str(item.input_name) if item.input_name else str(item.input_id)
-            prop_name = str(item.prop_name)
-            if not prop_name or not hasattr(window_manager, prop_name):
-                continue
             if item.input_type == InputType.VARIABLE.value:
-                continue
-            elif item.input_type == InputType.BOOLEAN.value:
-                layout.prop(window_manager, prop_name, text=label)
+                variables[str(item.source_pme_id)].append(item)
             else:
-                layout.prop(window_manager, prop_name, text=label)
-                
-        layout.label(text="Set Variables:")
-        # These are generally less common and more likely to be used for driving outputs, so we put them in a separate section at the bottom, they are things like global variables that rarely get changed
-        
-        for item in input_items:
-            label = str(item.input_name) if item.input_name else str(item.input_id)
-            prop_name = str(item.prop_name)
-            if not prop_name or not hasattr(window_manager, prop_name):
+                groups[str(item.source_pme_id)].append(item)
+
+        all_source_ids = sorted(set(list(groups.keys()) + list(variables.keys())))
+
+        for source_id in all_source_ids:
+            normal_items = groups.get(source_id, [])
+            var_items = variables.get(source_id, [])
+
+            if not normal_items and not var_items:
                 continue
-            if item.input_type == InputType.VARIABLE.value:
-                layout.prop(window_manager, prop_name, text=label)
+
+            section = layout.box()
+            if source_id:
+                section.label(text=source_id, icon='OBJECT_DATA')
             else:
-                continue
+                section.label(text="Root", icon='OBJECT_DATA')
+
+            for item in normal_items:
+                label = str(item.input_name) if item.input_name else str(item.input_id)
+                prop_name = str(item.prop_name)
+                if not prop_name or not hasattr(window_manager, prop_name):
+                    continue
+                section.prop(window_manager, prop_name, text=label)
+
+            if var_items:
+                var_box = section.box()
+                col = var_box.column(align=True)
+                col.label(text="Variables", icon='DRIVER')
+                for item in var_items:
+                    label = str(item.input_name) if item.input_name else str(item.input_id)
+                    prop_name = str(item.prop_name)
+                    if not prop_name or not hasattr(window_manager, prop_name):
+                        continue
+                    col.prop(window_manager, prop_name, text=label)
         
 class DIM_PT_ParametricOutputs(Panel):
     bl_label = "Parametric Outputs"

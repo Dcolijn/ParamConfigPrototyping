@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import uuid
 
 import bpy
 from bpy.types import Operator, PropertyGroup
@@ -276,6 +277,8 @@ class PARAMETRIC_PG_input_item(PropertyGroup):
     has_limits: bpy.props.BoolProperty(name="Has Limits", default=False)  # type: ignore[valid-type]
     min_value: bpy.props.FloatProperty(name="Min", default=0.0)  # type: ignore[valid-type]
     max_value: bpy.props.FloatProperty(name="Max", default=0.0)  # type: ignore[valid-type]
+    is_linked: bpy.props.BoolProperty(name="Is Linked", default=False)  # type: ignore[valid-type]
+    source_pme_id: bpy.props.StringProperty(name="Source PME ID")  # type: ignore[valid-type]
 
 
 class PARAMETRIC_PG_pme_entry(PropertyGroup):
@@ -286,16 +289,40 @@ class PARAMETRIC_PG_pme_entry(PropertyGroup):
 
 
 def _collect_unique_input_specs(context):
-    """Collect and merge unique input specs from all scene object configs."""
+    """Collect and merge unique input specs from all scene object configs.
+
+    Inputs that are *linked* (driven by a parent PME via outputValueMapping)
+    are excluded - they will be overridden at evaluation time and should not
+    appear as free UI controls.
+    """
     unique_inputs = {}
 
-    def merge_input(input_data):
+    # Build a map of {object_name: set_of_linked_input_ids} so we can skip
+    # mapped inputs when collecting from child objects.
+    linked_inputs_per_object: dict[str, set] = {}
+    for obj in context.scene.objects:
+        linked_raw = obj.get("parametric_linked_inputs_json")
+        if not linked_raw:
+            continue
+        try:
+            mapping = json.loads(linked_raw)
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if isinstance(mapping, dict):
+            linked_inputs_per_object[obj.name] = set(mapping.keys())
+
+    def merge_input(input_data, source_object_name: str = ""):
         if not isinstance(input_data, dict):
             return
 
         input_id = input_data.get("id")
         if not input_id:
             return
+
+        # Skip inputs that are driven by a parent mapping for this object.
+        if source_object_name and source_object_name in linked_inputs_per_object:
+            if input_id in linked_inputs_per_object[source_object_name]:
+                return
 
         input_type_raw = input_data.get("type", InputType.NUMBER.value)
         try:
@@ -311,6 +338,7 @@ def _collect_unique_input_specs(context):
                 "default": input_data.get("default"),
                 "min": input_data.get("min"),
                 "max": input_data.get("max"),
+                "source_pme_id": source_object_name,
             }
             return
 
@@ -336,7 +364,7 @@ def _collect_unique_input_specs(context):
         inputs = data.get("input", [])
         if isinstance(inputs, list):
             for input_data in inputs:
-                merge_input(input_data)
+                merge_input(input_data, obj.name)
 
     return [unique_inputs[key] for key in sorted(unique_inputs.keys())]
 
@@ -464,6 +492,143 @@ def _get_active_expression_values(context):
     return {}
 
 
+def _get_expression_values_by_object(context) -> dict[str, dict]:
+    """Return evaluated expression dictionaries for every parametric object."""
+    expression_by_object: dict[str, dict] = {}
+
+    for obj in context.scene.objects:
+        raw_json = obj.get("parametric_evaluated_outputs_json")
+        if not raw_json:
+            continue
+
+        try:
+            data = json.loads(raw_json)
+        except (TypeError, json.JSONDecodeError):
+            continue
+
+        if not isinstance(data, dict):
+            continue
+
+        expressions = data.get("expressions", {})
+        if isinstance(expressions, dict):
+            expression_by_object[obj.name] = expressions
+
+    return expression_by_object
+
+
+def _get_input_limits_from_config_object(obj) -> dict[str, dict[str, float | None]]:
+    """Read static input min/max limits from one object's stored config JSON."""
+    limits: dict[str, dict[str, float | None]] = {}
+
+    raw_config = obj.get("parametric_configuration_data_json")
+    if not raw_config:
+        return limits
+
+    try:
+        data = json.loads(raw_config)
+    except (TypeError, json.JSONDecodeError):
+        return limits
+
+    if not isinstance(data, dict):
+        return limits
+
+    inputs = data.get("input", [])
+    if not isinstance(inputs, list):
+        return limits
+
+    for input_data in inputs:
+        if not isinstance(input_data, dict):
+            continue
+
+        input_id = str(input_data.get("id", "")).strip()
+        if not input_id:
+            continue
+
+        min_raw = input_data.get("min")
+        max_raw = input_data.get("max")
+        limits[input_id] = {
+            "min": _coerce_number(min_raw) if isinstance(min_raw, (int, float)) else None,
+            "max": _coerce_number(max_raw) if isinstance(max_raw, (int, float)) else None,
+        }
+
+    return limits
+
+
+def _collect_propagated_soft_limits(context, expression_by_object: dict[str, dict], input_ids: set[str]) -> dict[str, dict[str, float]]:
+    """Lift child input min/max constraints onto mapped parent input ids.
+
+    Only direct mappings to exposed parent inputs are propagated. For each parent
+    input, propagated mins are combined with max(), and propagated maxes with
+    min(), so constraints become stricter as children are added.
+    """
+    propagated: dict[str, dict[str, float]] = {}
+
+    for obj in context.scene.objects:
+        linked_raw = obj.get("parametric_linked_inputs_json")
+        if not linked_raw:
+            continue
+
+        try:
+            mapping = json.loads(linked_raw)
+        except (TypeError, json.JSONDecodeError):
+            continue
+
+        if not isinstance(mapping, dict):
+            continue
+
+        child_expressions = expression_by_object.get(obj.name, {})
+        child_static_limits = _get_input_limits_from_config_object(obj)
+
+        for child_input_id_raw, parent_ref_raw in mapping.items():
+            child_input_id = str(child_input_id_raw).strip()
+            parent_ref = str(parent_ref_raw).strip()
+            if not child_input_id or not parent_ref:
+                continue
+
+            candidate_parent_ids = [parent_ref]
+            if not parent_ref.startswith("$"):
+                candidate_parent_ids.append(f"${parent_ref}")
+
+            parent_input_id = next((cid for cid in candidate_parent_ids if cid in input_ids), None)
+            if parent_input_id is None:
+                continue
+
+            normalized_child = child_input_id[1:] if child_input_id.startswith("$") else child_input_id
+            dynamic_min = child_expressions.get(f"$min-{normalized_child}")
+            dynamic_max = child_expressions.get(f"$max-{normalized_child}")
+
+            static_limits = child_static_limits.get(child_input_id, {"min": None, "max": None})
+            static_min = static_limits.get("min")
+            static_max = static_limits.get("max")
+
+            effective_min = None
+            effective_max = None
+
+            if isinstance(dynamic_min, (int, float)):
+                effective_min = float(dynamic_min)
+            elif isinstance(static_min, (int, float)):
+                effective_min = float(static_min)
+
+            if isinstance(dynamic_max, (int, float)):
+                effective_max = float(dynamic_max)
+            elif isinstance(static_max, (int, float)):
+                effective_max = float(static_max)
+
+            if effective_min is None and effective_max is None:
+                continue
+
+            bucket = propagated.setdefault(parent_input_id, {})
+            if effective_min is not None:
+                existing_min = bucket.get("min")
+                bucket["min"] = effective_min if existing_min is None else max(existing_min, effective_min)
+
+            if effective_max is not None:
+                existing_max = bucket.get("max")
+                bucket["max"] = effective_max if existing_max is None else min(existing_max, effective_max)
+
+    return propagated
+
+
 def _rebuild_numeric_property_with_soft_limits(window_manager, item, soft_min, soft_max):
     """Recreate a numeric WM property so updated hard/soft limits take effect."""
     prop_name = item.prop_name
@@ -537,9 +702,9 @@ def _apply_dynamic_soft_limits(context):
     if input_items is None:
         return
 
-    expressions = _get_active_expression_values(context)
-    if not expressions:
-        return
+    input_ids = {str(item.input_id) for item in input_items if str(item.input_id)}
+    expression_by_object = _get_expression_values_by_object(context)
+    propagated_limits = _collect_propagated_soft_limits(context, expression_by_object, input_ids)
 
     global _INTERNAL_INPUT_UPDATE
     _INTERNAL_INPUT_UPDATE = True
@@ -556,11 +721,28 @@ def _apply_dynamic_soft_limits(context):
             min_key = f"$min-{normalized}"
             max_key = f"$max-{normalized}"
 
-            min_expr_value = expressions.get(min_key)
-            max_expr_value = expressions.get(max_key)
+            source_id = str(item.source_pme_id)
+            source_expressions = expression_by_object.get(source_id, {})
+
+            min_expr_value = source_expressions.get(min_key)
+            max_expr_value = source_expressions.get(max_key)
 
             has_min = isinstance(min_expr_value, (int, float))
             has_max = isinstance(max_expr_value, (int, float))
+
+            propagated = propagated_limits.get(input_id, {})
+            propagated_min = propagated.get("min")
+            propagated_max = propagated.get("max")
+
+            if isinstance(propagated_min, (int, float)):
+                if (not has_min) or (float(propagated_min) > float(min_expr_value)):
+                    min_expr_value = float(propagated_min)
+                    has_min = True
+
+            if isinstance(propagated_max, (int, float)):
+                if (not has_max) or (float(propagated_max) < float(max_expr_value)):
+                    max_expr_value = float(propagated_max)
+                    has_max = True
 
             if not has_min and not has_max:
                 if item.has_limits:
@@ -606,6 +788,8 @@ def _populate_window_manager_inputs(window_manager, input_specs, reset_variables
         item.input_name = input_spec.get("name") or ""
         item.prop_name = prop_name
         item.input_type = input_type
+        item.is_linked = False  # inputs in WM are always unlinked (linked ones were filtered)
+        item.source_pme_id = input_spec.get("source_pme_id") or ""
 
         if input_type == InputType.BOOLEAN.value:
             item.has_limits = False
@@ -665,6 +849,102 @@ def sync_parametric_inputs_to_window_manager(context, reset_variables: bool = Fa
     recalculate_outputs_for_scene(context)
     _apply_dynamic_soft_limits(context)
     return len(input_specs)
+
+
+def _load_pme_children_recursive(
+    parent_object,
+    pme_data: dict,
+    directory_path: str,
+    blend_by_stem: dict,
+    collection,
+    depth: int = 0,
+):
+    """Recursively load child PMEs referenced by attachment point 'child' entries.
+
+    For each attachment point that has a 'child.elementId', the corresponding
+    JSON is loaded from *directory_path*, its parts appended, and the child root
+    Empty is parented to *parent_object*.  The normalized outputValueMapping is
+    stored on each child object as 'parametric_linked_inputs_json' so that
+    evaluation can cascade values and input collection can hide those inputs.
+    """
+    if depth > 10:
+        return
+
+    attachment_points = pme_data.get("attachmentPoints", [])
+    if not isinstance(attachment_points, list):
+        return
+
+    for ap in attachment_points:
+        if not isinstance(ap, dict):
+            continue
+
+        child_info = ap.get("child")
+        if not isinstance(child_info, dict):
+            continue
+
+        element_id = child_info.get("elementId", "").strip()
+        if not element_id:
+            continue
+
+        output_value_mapping = child_info.get("outputValueMapping", {})
+        if not isinstance(output_value_mapping, dict):
+            output_value_mapping = {}
+
+        source_ap_id = str(ap.get("id", "")).strip()
+        target_ap_id = str(child_info.get("targetId", "")).strip()
+
+        # Normalise mapping keys: ensure every child input id has a '$' prefix.
+        normalized_mapping: dict[str, str] = {}
+        for child_input_key, parent_expr_id in output_value_mapping.items():
+            norm_key = child_input_key if child_input_key.startswith("$") else f"${child_input_key}"
+            normalized_mapping[norm_key] = parent_expr_id
+
+        json_path = os.path.join(directory_path, f"{element_id}.json")
+        if not os.path.isfile(json_path):
+            continue
+
+        try:
+            child_data = _read_json_file(json_path)
+        except (UnicodeDecodeError, json.JSONDecodeError, OSError):
+            continue
+
+        if not _is_parametric_element_data(child_data):
+            continue
+
+        # Give the child object a unique name: elementId + short UUID suffix so
+        # multiple instances of the same PME (e.g. two 'PME_counter-top_overflow_sink'
+        # children) don't collide in Blender's object namespace.
+        short_uid = uuid.uuid4().hex[:6]
+        child_object_name = f"{element_id}_{short_uid}"
+
+        child_object, _, _ = _load_parametric_element(
+            child_data.get("parts", []),
+            child_object_name,
+            blend_by_stem,
+            collection,
+        )
+        _set_object_configuration_data(child_object, child_data)
+
+        # Tag the child with parent info and the linked input mapping.
+        child_object["parametric_parent_object_name"] = parent_object.name
+        child_object["parametric_linked_inputs_json"] = json.dumps(normalized_mapping)
+        if source_ap_id and target_ap_id:
+            child_object["parametric_ap_source_object_name"] = parent_object.name
+            child_object["parametric_ap_source_id"] = source_ap_id
+            child_object["parametric_ap_target_id"] = target_ap_id
+
+        # Parent the child Empty under the parent root in the hierarchy.
+        _parent_object_keep_world(child_object, parent_object)
+
+        # Recurse into this child's own attachment points.
+        _load_pme_children_recursive(
+            child_object,
+            child_data,
+            directory_path,
+            blend_by_stem,
+            collection,
+            depth + 1,
+        )
 
 
 def _create_empty_if_missing(name: str, collection):
@@ -1053,6 +1333,15 @@ class PARAMETRIC_OT_load_single_pme(Operator):
             context.collection,
         )
         _set_object_configuration_data(target_object, data)
+
+        # Recursively load any child PMEs referenced via attachment point children.
+        _load_pme_children_recursive(
+            target_object,
+            data,
+            directory_path,
+            blend_by_stem,
+            context.collection,
+        )
 
         context.view_layer.objects.active = target_object
         target_object.select_set(True)

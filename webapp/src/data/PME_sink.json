@@ -1,0 +1,48 @@
+{
+  "type": "parametricElement",
+  "input": [
+    {
+      "id": "$sink-width",
+      "name": "Sink Width",
+      "type": "number",
+      "default": 250,
+      "min": 100,
+      "max": 1000
+    },
+    {
+      "id": "$sink-depth",
+      "name": "Sink Depth",
+      "type": "number",
+      "default": 250,
+      "min": 100,
+      "max": 1000
+    }
+  ],
+  "expressions": [],
+  "parts": ["sink"],
+  "attachmentPoints": [
+    {
+      "id": "ap-sink-origin",
+      "type": "vector",
+      "inputLocation": "vec3(0, 0, 0)",
+      "inputRotation": "vec3(0, 0, 0)"
+    }
+  ],
+  "output": {
+    "shapekeys": [
+      {
+        "id": "$shape-sink-width",
+        "type": "shapekey",
+        "inputs": "$sink-width",
+        "conversion": "($sink-width - 500) / 500"
+      },
+      {
+        "id": "$shape-sink-depth",
+        "type": "shapekey",
+        "inputs": "$sink-depth",
+        "conversion": "($sink-depth - 500) / 500"
+      }
+    ],
+    "values": []
+  }
+}
